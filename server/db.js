@@ -5,6 +5,8 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
+// Isolate Fuel tables in their own schema on the consolidated DB
+pool.on('connect', client => { client.query('SET search_path TO fuel, public'); });
 
 const initDB = async () => {
   const client = await pool.connect();
@@ -125,3 +127,4 @@ const initDB = async () => {
 };
 
 module.exports = { pool, initDB };
+✅ Fuel db.js patched
