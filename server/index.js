@@ -17,6 +17,25 @@ app.use('/api/lng-vessels', require('./routes/vesselRoutes'));
 app.use('/api/fuel-prices', require('./routes/priceRoutes'));
 app.use('/api/export', require('./routes/exportRoutes'));
 
+ express = require('express');
+const cors = require('cors');
+const path = require('path');
+require('dotenv').config();
+const { initDB } = require('./db');
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/voyages', require('./routes/voyageRoutes'));
+app.use('/api/reports', require('./routes/reportRoutes'));
+app.use('/api/ref', require('./routes/refRoutes'));
+app.use('/api/lng-vessels', require('./routes/vesselRoutes'));
+app.use('/api/fuel-prices', require('./routes/priceRoutes'));
+app.use('/api/export', require('./routes/exportRoutes'));
+
 // ── ONE-TIME CURVE MIGRATION (remove after use) ──────────────────────────────
 app.get('/api/migrate-curves-now', async (req, res) => {
   const secret = req.query.secret;
