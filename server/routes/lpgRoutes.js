@@ -478,4 +478,212 @@ router.get('/vessels', authenticate, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+
+// ── PDF EXPORT ────────────────────────────────────────────────────────────────
+function authFromQuery(req, res, next) {
+  const token = req.query.token || (req.headers.authorization||'').replace('Bearer ','');
+  if (!token) return res.status(401).json({ error:'No token' });
+  const jwt = require('jsonwebtoken');
+  const SECRET = process.env.JWT_SECRET || 'fleet-budget-secret-change-me';
+  try { req.user = jwt.verify(token, SECRET); next(); }
+  catch { return res.status(401).json({ error:'Invalid token' }); }
+}
+
+router.get('/voyages/:id/pdf', authFromQuery, async (req, res) => {
+  try {
+    const voy = await pool.query('SELECT * FROM lpg_voyages WHERE id=$1', [req.params.id]);
+    if (!voy.rows.length) return res.status(404).json({ error:'Not found' });
+    const voyage  = voy.rows[0];
+    const records = (await pool.query('SELECT * FROM lpg_records WHERE voyage_id=$1 ORDER BY record_date,time_utc', [req.params.id])).rows;
+    const vessel  = (await pool.query('SELECT * FROM lpg_vessels WHERE name=$1', [voyage.vessel_name])).rows[0];
+    const cii     = vessel ? calcCII(records, parseFloat(vessel.dwt)) : null;
+
+    const PAGE_W=842, PAGE_H=595, M=30, CONTENT=782, BOTTOM=545;
+    const f = (v,d=2) => Number(v||0).toFixed(d);
+    const f0 = v => Math.round(Number(v||0)).toLocaleString();
+
+    const doc = new PDFDocument({ margin:M, size:'A4', layout:'landscape', autoFirstPage:false });
+    res.setHeader('Content-Type','application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=LPG_Fuel_${(voyage.voyage_number||'report').replace(/[^a-zA-Z0-9]/g,'_')}.pdf`);
+    doc.pipe(res);
+
+    let pageNum = 0;
+    const ROWS_PER_PAGE = 34;
+    const totalPages = Math.ceil(records.length / ROWS_PER_PAGE) + 1 + (cii ? 1 : 0);
+
+    function drawHeader(label) {
+      pageNum++;
+      doc.addPage();
+      doc.fill('#1E293B').rect(0,0,PAGE_W,50).fill();
+      doc.fill('#F59E0B').fontSize(9).font('Helvetica-Bold').text('FORCAP', M+4, M-12, {lineBreak:false});
+      doc.fill('#E2E8F0').fontSize(10).font('Helvetica-Bold').text(`${voyage.vessel_name}  ·  ${voyage.voyage_number||'—'}  ·  LPG Fuel Log`, M+60, M-10, {width:550,align:'center',lineBreak:false});
+      doc.fill('#64748B').fontSize(7).font('Helvetica').text(label, M+60, M+4, {width:550,align:'center',lineBreak:false});
+      try {
+        const logoPath = path.join(__dirname,'../assets/nsml_logo.jpg');
+        if (fs.existsSync(logoPath)) doc.image(logoPath, PAGE_W-M-70, M-14, {height:32,fit:[70,32]});
+      } catch(e) {}
+      // Footer
+      doc.fill('#E2E8F0').rect(M, PAGE_H-M-12, CONTENT, 0.5).fill();
+      doc.fill('#64748B').fontSize(6).font('Helvetica')
+         .text('FORCAP\xAE 2026  \u2014  Confidential', M, PAGE_H-M-7, {lineBreak:false})
+         .text(`Page ${pageNum} of ${totalPages}`, M, PAGE_H-M-7, {width:CONTENT,align:'right',lineBreak:false});
+      return 60;
+    }
+
+    // ── RECORDS PAGES ──
+    const recCols = [
+      {h:'Date',w:54,a:'left'},{h:'Time',w:28,a:'center'},{h:'Status',w:110,a:'left'},
+      {h:'Sea',w:26,a:'right'},{h:'Dist',w:30,a:'right'},{h:'RPM',w:28,a:'right'},
+      {h:'ME ULSFO',w:40,a:'right'},{h:'AE ULSFO',w:40,a:'right'},{h:'ULSFO ROB',w:42,a:'right'},
+      {h:'LSMGO',w:36,a:'right'},{h:'LSMGO ROB',w:42,a:'right'},
+      {h:'Bnkr U',w:34,a:'right'},{h:'CrgPlt',w:32,a:'right'},
+    ];
+
+    let y = drawHeader('DAILY NOON RECORDS');
+
+    function drawTableHeader(y) {
+      doc.fill('#1E293B').rect(M,y,CONTENT,13).fill();
+      let x = M+2;
+      doc.fill('#F59E0B').fontSize(5.5).font('Helvetica-Bold');
+      recCols.forEach(c => { doc.text(c.h,x,y+4,{width:c.w,align:c.a,lineBreak:false}); x+=c.w+1; });
+      return y+14;
+    }
+
+    y = drawTableHeader(y);
+
+    records.forEach((r, ri) => {
+      if (y+11 > BOTTOM) { y = drawHeader('DAILY NOON RECORDS (continued)'); y = drawTableHeader(y); }
+      const bg = ri%2===0?'#0F172A':'#1A2535';
+      doc.fill(parseFloat(r.sea_hrs)>12 ? bg : '#1A1F2E').rect(M,y,CONTENT,11).fill();
+      let x = M+2;
+      const vals = [
+        r.record_date?.slice(0,10)||'',
+        r.time_utc||'',
+        (r.status||'').slice(0,30),
+        f(r.sea_hrs,1), f(r.obs_dist,0), f(r.me_rpm,1),
+        f(r.ulsfo_me), f(r.ulsfo_ae), f(r.ulsfo_rob),
+        f(r.lsmgo_total), f(r.lsmgo_rob),
+        parseFloat(r.ulsfo_bunkered)>0 ? f(r.ulsfo_bunkered) : '',
+        f(r.cargo_plant_rhr,1),
+      ];
+      vals.forEach((v,vi) => {
+        const c = vi===8||vi===10?'#67E8F9':vi===0?'#FBBF24':'#CBD5E1';
+        doc.fill(c).fontSize(6).font('Helvetica').text(String(v),x,y+3,{width:recCols[vi].w,align:recCols[vi].a,lineBreak:false});
+        x+=recCols[vi].w+1;
+      });
+      y+=11;
+    });
+
+    // Totals
+    doc.fill('#1E293B').rect(M,y,CONTENT,13).fill();
+    const tots = ['','','TOTALS',
+      f(records.reduce((s,r)=>s+parseFloat(r.sea_hrs||0),0),1),
+      f0(records.reduce((s,r)=>s+parseFloat(r.obs_dist||0),0)), '',
+      f(records.reduce((s,r)=>s+parseFloat(r.ulsfo_me||0),0)),
+      f(records.reduce((s,r)=>s+parseFloat(r.ulsfo_ae||0),0)), '',
+      f(records.reduce((s,r)=>s+parseFloat(r.lsmgo_total||0),0)), '',
+      f(records.reduce((s,r)=>s+parseFloat(r.ulsfo_bunkered||0),0)), '',
+    ];
+    let x2 = M+2;
+    doc.fill('#F59E0B').fontSize(6).font('Helvetica-Bold');
+    tots.forEach((v,vi) => { doc.text(String(v),x2,y+4,{width:recCols[vi].w,align:recCols[vi].a,lineBreak:false}); x2+=recCols[vi].w+1; });
+
+    // ── SUMMARY PAGE ──
+    y = drawHeader('FUEL SUMMARY');
+    const totU = records.reduce((s,r)=>s+parseFloat(r.ulsfo_me||0)+parseFloat(r.ulsfo_ae||0)+parseFloat(r.ulsfo_blr||0),0);
+    const totL = records.reduce((s,r)=>s+parseFloat(r.lsmgo_total||0),0);
+    const totD = records.reduce((s,r)=>s+parseFloat(r.obs_dist||0),0);
+    const last = records.length ? records[records.length-1] : {};
+    const W2   = (CONTENT-10)/2;
+
+    const drawSumBox = (bx,by,title,rows) => {
+      const bh = 14 + rows.length*12;
+      doc.fill('#1E293B').rect(bx,by,W2,bh).fill();
+      doc.fill('#F59E0B').fontSize(7).font('Helvetica-Bold').text(title,bx+5,by+4,{lineBreak:false});
+      rows.forEach(([l,v,c],i) => {
+        const ry=by+17+i*12;
+        doc.fill('#64748B').fontSize(6.5).font('Helvetica').text(l,bx+5,ry,{width:W2*0.6,lineBreak:false});
+        doc.fill(c||'#E2E8F0').fontSize(6.5).font('Helvetica-Bold').text(v,bx+W2*0.6,ry,{width:W2*0.35,align:'right',lineBreak:false});
+      });
+      return bh;
+    };
+
+    const bh = drawSumBox(M, y, 'ULSFO CONSUMPTION', [
+      ['ME Consumption', f(records.reduce((s,r)=>s+parseFloat(r.ulsfo_me||0),0))+' MT'],
+      ['AE Consumption', f(records.reduce((s,r)=>s+parseFloat(r.ulsfo_ae||0),0))+' MT'],
+      ['Boiler Consumption', f(records.reduce((s,r)=>s+parseFloat(r.ulsfo_blr||0),0))+' MT'],
+      ['Total ULSFO', f(totU)+' MT', '#FBBF24'],
+      ['Bunkered', f(records.reduce((s,r)=>s+parseFloat(r.ulsfo_bunkered||0),0))+' MT', '#34D399'],
+      ['Latest ROB', f(last.ulsfo_rob)+' MT', '#67E8F9'],
+    ]);
+    drawSumBox(M+W2+10, y, 'LSMGO CONSUMPTION', [
+      ['ME LSMGO', f(records.reduce((s,r)=>s+parseFloat(r.lsmgo_me||0),0))+' MT'],
+      ['AE/IG LSMGO', f(records.reduce((s,r)=>s+parseFloat(r.lsmgo_ae||0),0))+' MT'],
+      ['Total LSMGO', f(totL)+' MT', '#67E8F9'],
+      ['Bunkered', f(records.reduce((s,r)=>s+parseFloat(r.lsmgo_bunkered||0),0))+' MT', '#34D399'],
+      ['Latest ROB', f(last.lsmgo_rob)+' MT', '#67E8F9'],
+      ['Total Distance', f0(totD)+' NM', '#A78BFA'],
+    ]);
+    y += bh + 10;
+    drawSumBox(M, y, 'RUNNING HOURS', [
+      ['AE1 (cumulative)', f(last.ae1_rhr,1)+' hrs'],
+      ['AE2 (cumulative)', f(last.ae2_rhr,1)+' hrs'],
+      ['AE3 (cumulative)', f(last.ae3_rhr,1)+' hrs'],
+      ['Cargo Plant (total)', f(records.reduce((s,r)=>s+parseFloat(r.cargo_plant_rhr||0),0),1)+' hrs'],
+      ['Sea Hours', f(records.reduce((s,r)=>s+parseFloat(r.sea_hrs||0),0),1)+' hrs'],
+    ]);
+    drawSumBox(M+W2+10, y, 'FRESH WATER & LUBE', [
+      ['FW Produced', f(records.reduce((s,r)=>s+parseFloat(r.fw_produced||0),0))+' T'],
+      ['FW Consumed', f(records.reduce((s,r)=>s+parseFloat(r.fw_consumed||0),0))+' T'],
+      ['FW ROB', f(last.fw_rob)+' T'],
+      ['Cyl Oil Cons', f(records.reduce((s,r)=>s+parseFloat(r.cyl_oil_cons||0),0))+' L'],
+      ['Cyl Oil ROB', f(last.cyl_oil_rob)+' L'],
+    ]);
+
+    // ── CII PAGE ──
+    if (cii) {
+      y = drawHeader('CII — CARBON INTENSITY INDICATOR  ·  Gas Carrier  ·  IMO MEPC.352(78)');
+      const rCol = {A:'#059669',B:'#0891B2',C:'#D97706',D:'#EA580C',E:'#DC2626'}[cii.rating]||'#94A3B8';
+      const kpiW = CONTENT/4;
+      [{l:'Attained CII',v:f(cii.attained),c:rCol},{l:'CII Rating',v:cii.rating,c:rCol},{l:'Required CII',v:f(cii.ciiRequired),c:'#94A3B8'},{l:'Total CO\u2082 (MT)',v:f(cii.totalCO2,1),c:'#67E8F9'}].forEach((k,i) => {
+        const kx=M+i*kpiW;
+        doc.fill('#1E293B').rect(kx,y,kpiW-4,40).fill();
+        doc.fill('#64748B').fontSize(6).font('Helvetica').text(k.l,kx+5,y+7,{lineBreak:false});
+        doc.fill(k.c).fontSize(16).font('Helvetica-Bold').text(k.v,kx+5,y+16,{lineBreak:false});
+      });
+      y+=48;
+      const bw=CONTENT/5;
+      ['A','B','C','D','E'].forEach((l,i) => {
+        const c={A:'#059669',B:'#0891B2',C:'#D97706',D:'#EA580C',E:'#DC2626'}[l];
+        doc.fill(c).rect(M+i*bw,y,bw,16).fill();
+        doc.fill('#FFF').fontSize(8).font('Helvetica-Bold').text(l,M+i*bw,y+5,{width:bw,align:'center',lineBreak:false});
+      });
+      y+=20;
+      [`\u2264 ${f(cii.bounds.A)}`,`\u2264 ${f(cii.bounds.B)}`,`\u2264 ${f(cii.bounds.C)}`,`\u2264 ${f(cii.bounds.D)}`,`> ${f(cii.bounds.D)}`].forEach((l,i) => {
+        doc.fill('#64748B').fontSize(6).font('Helvetica').text(l,M+i*bw,y,{width:bw,align:'center',lineBreak:false});
+      });
+      y+=16;
+      const pw=(CONTENT-8)/2;
+      [['Ship Type','Gas Carrier (LPG)'],['DWT',f0(cii.dwt)+' MT'],['Reference CII',f(cii.ciiRef)],['Reduction Factor',cii.Z+'%'],['Required CII',f(cii.ciiRequired)],['CF (ULSFO)','3.114'],['CF (LSMGO)','3.206'],['Total Distance',f0(cii.totalDist)+' NM']].forEach((row,i) => {
+        const col=i%2; const px=M+col*(pw+8);
+        if(col===0&&i>0) y+=12;
+        doc.fill('#1E293B').rect(px,y,pw,11).fill();
+        doc.fill('#64748B').fontSize(6.5).font('Helvetica').text(row[0],px+4,y+2,{width:pw*0.55,lineBreak:false});
+        doc.fill('#E2E8F0').fontSize(6.5).font('Helvetica-Bold').text(row[1],px+pw*0.55,y+2,{width:pw*0.42,align:'right',lineBreak:false});
+      });
+      y+=20;
+      const pct=Math.min((cii.attained/(cii.bounds.D*1.3))*CONTENT,CONTENT);
+      doc.fill('#FFFFFF').rect(M,y,CONTENT,14).fill();
+      doc.fill(rCol).rect(M,y,pct,14).fill();
+      doc.fill('#FFFFFF').fontSize(7).font('Helvetica-Bold').text(`Attained CII: ${f(cii.attained)} (${cii.rating})  |  Required: ${f(cii.ciiRequired)}`,M+6,y+4,{lineBreak:false});
+    }
+
+    doc.end();
+  } catch(err) {
+    console.error('[LPG PDF]', err);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
+
