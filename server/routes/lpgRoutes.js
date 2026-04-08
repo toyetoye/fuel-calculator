@@ -180,6 +180,17 @@ function parseRow(row, vesselName) {
   };
 }
 
+// ── LPG access middleware ────────────────────────────────────────────────────
+// Allows: admin, manager, or users assigned to an Alfred Temile vessel
+function lpgAccess(req, res, next) {
+  const role         = req.user?.role;
+  const vesselNames  = req.user?.vessel_names || [];
+  const hasLpg = ['admin','manager'].includes(role) ||
+    vesselNames.some(v => v.toLowerCase().includes('alfred temile'));
+  if (!hasLpg) return res.status(403).json({ error: 'LPG access not assigned' });
+  next();
+}
+
 // ── CII calculation for gas carriers ─────────────────────────────────────────
 function calcCII(records, dwt) {
   if (!dwt || dwt <= 0) return null;
@@ -328,7 +339,7 @@ router.post('/import/confirm', authenticate, adminOnly, async (req, res) => {
 
 // ── VOYAGE ROUTES ─────────────────────────────────────────────────────────────
 
-router.get('/voyages', authenticate, async (req, res) => {
+router.get('/voyages', authenticate, lpgAccess, async (req, res) => {
   try {
     const { vessel } = req.query;
     let q = 'SELECT v.*, COUNT(r.id)::int as record_count FROM lpg_voyages v LEFT JOIN lpg_records r ON r.voyage_id=v.id';
@@ -340,7 +351,7 @@ router.get('/voyages', authenticate, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-router.get('/voyages/:id', authenticate, async (req, res) => {
+router.get('/voyages/:id', authenticate, lpgAccess, async (req, res) => {
   try {
     const voy = await pool.query('SELECT * FROM lpg_voyages WHERE id=$1', [req.params.id]);
     if (!voy.rows.length) return res.status(404).json({ error: 'Not found' });
@@ -361,7 +372,7 @@ router.delete('/voyages/:id', authenticate, adminOnly, async (req, res) => {
 
 // ── RECORD CRUD ───────────────────────────────────────────────────────────────
 
-router.post('/records', authenticate, async (req, res) => {
+router.post('/records', authenticate, lpgAccess, async (req, res) => {
   try {
     const r = req.body;
     const result = await pool.query(`
@@ -391,7 +402,7 @@ router.post('/records', authenticate, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-router.put('/records/:id', authenticate, async (req, res) => {
+router.put('/records/:id', authenticate, lpgAccess, async (req, res) => {
   try {
     const r = req.body;
     const result = await pool.query(`
@@ -425,7 +436,7 @@ router.delete('/records/:id', authenticate, adminOnly, async (req, res) => {
 });
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
-router.get('/dashboard', authenticate, async (req, res) => {
+router.get('/dashboard', authenticate, lpgAccess, async (req, res) => {
   try {
     const { vessel, days = 90 } = req.query;
     const since = new Date(Date.now() - days * 86400000).toISOString().slice(0,10);
@@ -480,7 +491,7 @@ router.get('/dashboard', authenticate, async (req, res) => {
 });
 
 // ── LIST VESSELS ──────────────────────────────────────────────────────────────
-router.get('/vessels', authenticate, async (req, res) => {
+router.get('/vessels', authenticate, lpgAccess, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM lpg_vessels WHERE active=true ORDER BY name');
     res.json(rows);
