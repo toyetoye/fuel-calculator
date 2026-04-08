@@ -9,7 +9,7 @@ import VoyageImport from './pages/VoyageImport';
 import VesselManage from './pages/VesselManage';
 import UserManage from './pages/UserManage';
 import FuelPrices from './pages/FuelPrices';
-import { LPGVoyageList, LPGVoyageDetail, LPGImport, LPGDashboard } from './pages/LPGFuel';
+import { LPGVoyageList, LPGVoyageDetail as LPGPeriodDetail, LPGImport, LPGDashboard } from './pages/LPGFuel';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -77,7 +77,7 @@ export default function App() {
             <Route path="/voyages/new" element={<ProtectedRoute><VoyageForm /></ProtectedRoute>} />
             <Route path="/voyages/:id/edit" element={<ProtectedRoute><VoyageForm /></ProtectedRoute>} />
             <Route path="/lpg" element={<ProtectedRoute><LPGVoyageList /></ProtectedRoute>} />
-        <Route path="/lpg/voyages/:id" element={<ProtectedRoute><LPGVoyageDetail /></ProtectedRoute>} />
+        <Route path="/lpg/periods/:id" element={<ProtectedRoute><LPGPeriodDetail /></ProtectedRoute>} />
         <Route path="/lpg/import" element={<ProtectedRoute><LPGImport /></ProtectedRoute>} />
         <Route path="/lpg/dashboard" element={<ProtectedRoute><LPGDashboard /></ProtectedRoute>} />
         <Route path="/voyages/import" element={<VoyageImport />} />
