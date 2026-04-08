@@ -292,11 +292,34 @@ router.get('/:voyageId/pdf', authFromQuery, async (req, res) => {
     });
 
     // ── CII Section ──────────────────────────────────────────────────────────
-    if (calc.cii_attained && calc.cii_required && calc.cii_bounds) {
+    // Compute CII inline from local variables (export route has its own calc context)
+    const ciiDwt = vessel ? parseFloat(vessel.dwt) || 0 : 0;
+    const ciiCfHfo = vessel ? parseFloat(vessel.cf_hfo) || 3.114 : 3.114;
+    const ciiCfFoe = vessel ? parseFloat(vessel.cf_foe) || 2.750 : 2.750;
+    const ciiRef = 9.827;
+    const ciiYear = new Date().getFullYear();
+    const ciiZ = ({ 2023:5,2024:5,2025:7,2026:9,2027:11,2028:11,2029:11,2030:11 })[ciiYear] || 9;
+    const ciiRequired = ciiRef * (1 - ciiZ / 100);
+    const ciiBounds = { A: ciiRequired*0.82, B: ciiRequired*0.93, C: ciiRequired*1.14, D: ciiRequired*1.34 };
+    function getCiiRating(v) { return v<=ciiBounds.A?'A':v<=ciiBounds.B?'B':v<=ciiBounds.C?'C':v<=ciiBounds.D?'D':'E'; }
+
+    let cumCO2=0, cumDist2=0;
+    const ciiDaily = processed.map(r => {
+      const dCO2 = (r.hfo*ciiCfHfo) + (r.foe*ciiCfFoe);
+      cumCO2 += dCO2; cumDist2 += r.dist;
+      const runCII = cumDist2>0 ? (cumCO2*1000000)/(ciiDwt*cumDist2) : 0;
+      return { day:r.day_number, date:r.report_date, hfo:r.hfo, foe:r.foe, dist:r.dist,
+               daily_co2:dCO2, daily_cii: r.dist>0?(dCO2*1000000)/(ciiDwt*r.dist):0,
+               cum_co2:cumCO2, cum_dist:cumDist2, running_cii:runCII, running_rating:getCiiRating(runCII) };
+    });
+    const ciiAttained = cumDist2>0 ? (cumCO2*1000000)/(ciiDwt*cumDist2) : 0;
+    const ciiRating = getCiiRating(ciiAttained);
+
+    if (ciiDwt > 0) {
       doc.addPage();
       y = 30;
       const ratingColors = { A: '#059669', B: '#0891B2', C: '#D97706', D: '#EA580C', E: '#DC2626' };
-      const rColor = ratingColors[calc.cii_rating] || '#94A3B8';
+      const rColor = ratingColors[ciiRating] || '#94A3B8';
 
       // CII Header
       doc.fill('#0F172A').rect(0, 0, pageW + 60, 50).fill();
@@ -307,10 +330,10 @@ router.get('/:voyageId/pdf', authFromQuery, async (req, res) => {
       // CII KPI row
       const kpiW = (pageW - 30) / 4;
       const kpis = [
-        { l: 'Attained CII', v: Number(calc.cii_attained).toFixed(2), c: rColor },
-        { l: 'CII Rating', v: calc.cii_rating, c: rColor },
-        { l: 'Required CII', v: Number(calc.cii_required).toFixed(2), c: '#94A3B8' },
-        { l: 'Total CO₂ (MT)', v: Number(calc.cii_total_co2).toFixed(1), c: '#67E8F9' },
+        { l: 'Attained CII', v: Number(ciiAttained).toFixed(2), c: rColor },
+        { l: 'CII Rating', v: ciiRating, c: rColor },
+        { l: 'Required CII', v: Number(ciiRequired).toFixed(2), c: '#94A3B8' },
+        { l: 'Total CO₂ (MT)', v: Number(cumCO2).toFixed(1), c: '#67E8F9' },
       ];
       kpis.forEach((k, i) => {
         const kx = 30 + i * kpiW;
@@ -335,11 +358,11 @@ router.get('/:voyageId/pdf', authFromQuery, async (req, res) => {
 
       // Boundary labels
       const boundVals = [
-        `≤ ${Number(calc.cii_bounds.A).toFixed(2)}`,
-        `≤ ${Number(calc.cii_bounds.B).toFixed(2)}`,
-        `≤ ${Number(calc.cii_bounds.C).toFixed(2)}`,
-        `≤ ${Number(calc.cii_bounds.D).toFixed(2)}`,
-        `> ${Number(calc.cii_bounds.D).toFixed(2)}`
+        `≤ ${Number(ciiBounds.A).toFixed(2)}`,
+        `≤ ${Number(ciiBounds.B).toFixed(2)}`,
+        `≤ ${Number(ciiBounds.C).toFixed(2)}`,
+        `≤ ${Number(ciiBounds.D).toFixed(2)}`,
+        `> ${Number(ciiBounds.D).toFixed(2)}`
       ];
       boundVals.forEach((v, i) => {
         doc.fill('#64748B').fontSize(6).font('Helvetica').text(v, 30 + i * bw, y, { width: bw, align: 'center' });
@@ -349,13 +372,13 @@ router.get('/:voyageId/pdf', authFromQuery, async (req, res) => {
       // CII parameters
       const paramRows = [
         ['Ship Type', 'LNG Carrier'],
-        ['DWT', Number(calc.cii_dwt).toLocaleString() + ' MT'],
-        ['Reference CII', Number(calc.cii_ref).toFixed(3)],
-        ['Reduction Factor', calc.cii_reduction_pct + '%'],
-        ['Required CII', Number(calc.cii_required).toFixed(3)],
-        ['CF (HFO)', String(calc.cii_cf_hfo)],
-        ['CF (LNG/FOE)', String(calc.cii_cf_foe)],
-        ['Total Distance', Number(calc.cii_total_dist).toLocaleString() + ' NM'],
+        ['DWT', Number(ciiDwt).toLocaleString() + ' MT'],
+        ['Reference CII', Number(ciiRef).toFixed(3)],
+        ['Reduction Factor', ciiZ + '%'],
+        ['Required CII', Number(ciiRequired).toFixed(3)],
+        ['CF (HFO)', String(ciiCfHfo)],
+        ['CF (LNG/FOE)', String(ciiCfFoe)],
+        ['Total Distance', Number(cumDist2).toLocaleString() + ' NM'],
       ];
       const halfW = (pageW - 30) / 2 - 6;
       paramRows.forEach((row, i) => {
@@ -369,7 +392,7 @@ router.get('/:voyageId/pdf', authFromQuery, async (req, res) => {
       y += 22;
 
       // Daily CII table
-      if (calc.cii_daily && calc.cii_daily.length > 0) {
+      if (ciiDaily && ciiDaily.length > 0) {
         doc.fill('#0F172A').rect(30, y, pageW - 30, 13).fill();
         const ciiCols = [
           { h: 'Day', w: 22, align: 'center' },
@@ -390,7 +413,7 @@ router.get('/:voyageId/pdf', authFromQuery, async (req, res) => {
         });
         y += 14;
 
-        calc.cii_daily.forEach((r, ri) => {
+        ciiDaily.forEach((r, ri) => {
           if (y > 740) { doc.addPage(); y = 30; }
           const rc = ri % 2 === 0 ? '#0F172A' : '#141E2E';
           doc.fill(rc).rect(30, y, pageW - 30, 11).fill();
@@ -421,14 +444,14 @@ router.get('/:voyageId/pdf', authFromQuery, async (req, res) => {
         const totData = [
           { v: 'TOTAL', align: 'center', c: '#94A3B8', w: 22 },
           { v: '', align: 'left', c: '#94A3B8', w: 42 },
-          { v: Number(calc.total_hfo||0).toFixed(1), align: 'right', c: '#FBBF24', w: 30 },
-          { v: Number(calc.total_foe||0).toFixed(2), align: 'right', c: '#FBBF24', w: 30 },
-          { v: Math.round(calc.cii_total_dist||0).toString(), align: 'right', c: '#FBBF24', w: 35 },
-          { v: Number(calc.cii_total_co2||0).toFixed(1), align: 'right', c: '#FBBF24', w: 40 },
+          { v: Number(totHFO||0).toFixed(1), align: 'right', c: '#FBBF24', w: 30 },
+          { v: Number(totFOE||0).toFixed(2), align: 'right', c: '#FBBF24', w: 30 },
+          { v: Math.round(cumDist2||0).toString(), align: 'right', c: '#FBBF24', w: 35 },
+          { v: Number(cumCO2||0).toFixed(1), align: 'right', c: '#FBBF24', w: 40 },
           { v: '', align: 'right', c: '#94A3B8', w: 35 },
           { v: '', align: 'right', c: '#94A3B8', w: 40 },
-          { v: Number(calc.cii_attained||0).toFixed(2), align: 'right', c: rColor, w: 35 },
-          { v: calc.cii_rating, align: 'center', c: rColor, w: 28 },
+          { v: Number(ciiAttained||0).toFixed(2), align: 'right', c: rColor, w: 35 },
+          { v: ciiRating, align: 'center', c: rColor, w: 28 },
         ];
         cx = 32;
         totData.forEach(cell => {
