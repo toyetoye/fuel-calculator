@@ -9,7 +9,7 @@ import VoyageImport from './pages/VoyageImport';
 import VesselManage from './pages/VesselManage';
 import UserManage from './pages/UserManage';
 import FuelPrices from './pages/FuelPrices';
-import { LPGVoyageList, LPGVoyageDetail as LPGPeriodDetail, LPGImport, LPGDashboard } from './pages/LPGFuel';
+import { LPGVoyageList, LPGVoyageDetail, LPGImport, LPGDashboard } from './pages/LPGFuel';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
