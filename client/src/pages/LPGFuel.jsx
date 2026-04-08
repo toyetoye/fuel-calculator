@@ -64,7 +64,7 @@ export function LPGVoyageList() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-100">LPG Fuel Log</h1>
-          <p className="text-sm text-slate-500 mt-1">Monthly engine & fuel records — Alfred Temile fleet</p>
+          <p className="text-sm text-slate-500 mt-1">Monthly engine &amp; fuel records — Alfred Temile fleet</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => nav('/lpg/dashboard')} className={`${BTN} bg-slate-700/50 border border-white/10 text-slate-200`}>📊 Dashboard</button>
@@ -363,7 +363,7 @@ function EngineTab({records}) {
         ))}
       </div>
       <div className={CARD}>
-        <h3 className="text-sm font-semibold text-amber-300 mb-4">Speed & RPM</h3>
+        <h3 className="text-sm font-semibold text-amber-300 mb-4">Speed &amp; RPM</h3>
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={cd} margin={{top:0,right:10,left:-10,bottom:0}}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)"/>
@@ -388,7 +388,7 @@ function EngineTab({records}) {
           </ResponsiveContainer>
         </div>
         <div className={CARD}>
-          <h3 className="text-sm font-semibold text-amber-300 mb-4">BHP & KW</h3>
+          <h3 className="text-sm font-semibold text-amber-300 mb-4">BHP &amp; KW</h3>
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={cd} margin={{top:0,right:10,left:-10,bottom:0}}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)"/>
@@ -453,7 +453,7 @@ function AuxTab({records}) {
           </ResponsiveContainer>
         </div>
         <div className={CARD}>
-          <h3 className="text-sm font-semibold text-amber-300 mb-4">Fresh Water ROB & Production (T)</h3>
+          <h3 className="text-sm font-semibold text-amber-300 mb-4">Fresh Water ROB &amp; Production (T)</h3>
           <ResponsiveContainer width="100%" height={160}>
             <LineChart data={wi} margin={{top:0,right:10,left:-10,bottom:0}}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)"/>
@@ -465,7 +465,7 @@ function AuxTab({records}) {
           </ResponsiveContainer>
         </div>
         <div className={CARD}>
-          <h3 className="text-sm font-semibold text-amber-300 mb-4">Cylinder Oil ROB & Consumption (L)</h3>
+          <h3 className="text-sm font-semibold text-amber-300 mb-4">Cylinder Oil ROB &amp; Consumption (L)</h3>
           <ResponsiveContainer width="100%" height={160}>
             <LineChart data={wi} margin={{top:0,right:10,left:-10,bottom:0}}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)"/>
@@ -684,7 +684,7 @@ export function LPGDashboard() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-100">LPG Fleet Dashboard</h1>
-          <p className="text-sm text-slate-500 mt-1">Fuel, engine & auxiliary trends</p>
+          <p className="text-sm text-slate-500 mt-1">Fuel, engine &amp; auxiliary trends</p>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
           <select value={vessel} onChange={e=>setVessel(e.target.value)} className="px-3 py-1.5 rounded-lg bg-slate-800/50 border border-white/10 text-slate-200 text-sm focus:outline-none">
@@ -705,7 +705,7 @@ export function LPGDashboard() {
       </div>
 
       <div className={CARD}>
-        <h3 className="text-sm font-semibold text-amber-300 mb-4">Daily Fuel Consumption — ULSFO & LSMGO (MT)</h3>
+        <h3 className="text-sm font-semibold text-amber-300 mb-4">Daily Fuel Consumption — ULSFO &amp; LSMGO (MT)</h3>
         <ResponsiveContainer width="100%" height={220}>
           <AreaChart data={trend} margin={{top:0,right:10,left:-10,bottom:0}}>
             <defs>
