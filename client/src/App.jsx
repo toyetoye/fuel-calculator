@@ -25,11 +25,16 @@ function Sidebar() {
   const nav = useNavigate();
   const loc = useLocation();
   const r = user?.role;
-  const isAdmin = r === 'admin';
+  const isAdmin   = r === 'admin';
+  const isManager = r === 'manager';
   const canCreate = ['admin', 'superintendent', 'vessel'].includes(r);
+  // LPG access: admin, manager, or assigned to an Alfred Temile vessel
+  const hasLpgAccess = isAdmin || isManager ||
+    (user?.vessel_names || []).some(v => v.toLowerCase().includes('alfred temile'));
   const links = [
     { path: '/voyages', label: 'Voyages', icon: '⊞' },
     ...(canCreate ? [{ path: '/voyages/new', label: 'New Voyage', icon: '⊕' }] : []),
+    ...(hasLpgAccess ? [{ path: '/lpg', label: 'LPG Fuel Log', icon: '⛽' }] : []),
     ...(isAdmin ? [{ path: '/vessels', label: 'LNG Vessels', icon: '⚓' }] : []),
     ...(isAdmin ? [{ path: '/fuel-prices', label: 'Fuel Prices', icon: '⊙' }] : []),
     ...(isAdmin ? [{ path: '/users', label: 'Users', icon: '◈' }] : []),
@@ -71,10 +76,10 @@ export default function App() {
             <Route path="/voyages" element={<ProtectedRoute><VoyageList /></ProtectedRoute>} />
             <Route path="/voyages/new" element={<ProtectedRoute><VoyageForm /></ProtectedRoute>} />
             <Route path="/voyages/:id/edit" element={<ProtectedRoute><VoyageForm /></ProtectedRoute>} />
-            <Route path="/lpg" element={<LPGVoyageList />} />
-        <Route path="/lpg/voyages/:id" element={<LPGVoyageDetail />} />
-        <Route path="/lpg/import" element={<LPGImport />} />
-        <Route path="/lpg/dashboard" element={<LPGDashboard />} />
+            <Route path="/lpg" element={<ProtectedRoute><LPGVoyageList /></ProtectedRoute>} />
+        <Route path="/lpg/voyages/:id" element={<ProtectedRoute><LPGVoyageDetail /></ProtectedRoute>} />
+        <Route path="/lpg/import" element={<ProtectedRoute><LPGImport /></ProtectedRoute>} />
+        <Route path="/lpg/dashboard" element={<ProtectedRoute><LPGDashboard /></ProtectedRoute>} />
         <Route path="/voyages/import" element={<VoyageImport />} />
         <Route path="/voyages/:id" element={<ProtectedRoute><VoyageDetail /></ProtectedRoute>} />
             <Route path="/vessels" element={<ProtectedRoute><VesselManage /></ProtectedRoute>} />
