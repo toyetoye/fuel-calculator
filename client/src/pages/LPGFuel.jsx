@@ -666,8 +666,9 @@ export function LPGDashboard() {
 
   useEffect(()=>{ apiFetch('/lpg/vessels').then(v=>setVessels(Array.isArray(v)?v:[])).catch(()=>{}); },[]);
   useEffect(()=>{
-    setErr('');
-    const qs=`?days=${days}${vessel?`&vessel=${encodeURIComponent(vessel)}`:''}`;
+    if (!vessel) return;   // /monthly requires vessel
+    setErr(''); setData(null);
+    const qs=`?vessel=${encodeURIComponent(vessel)}&days=${days}`;
     apiFetch(`/lpg/monthly${qs}`).then(setData).catch(e=>setErr(e.message));
   },[vessel,days]);
 
