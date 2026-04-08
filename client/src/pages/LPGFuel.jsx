@@ -495,7 +495,7 @@ function CiiTab({cii}) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-4 gap-4">
-        {[{l:'Attained CII',v:f2(cii.attained),c:rc(cii.rating)},{l:'CII Rating',v:cii.rating,c:rc(cii.rating)},{l:'Required CII',v:f2(cii.ciiRequired),c:'#94A3B8'},{l:'Total CO₂',v:`${f1(cii.totalCO2)} MT`,c:'#67E8F9'}].map((k,i)=>(
+        {[{l:'Attained CII',v:f2(cii.attained),c:rc(cii.rating)},{l:'CII Rating',v:cii.rating,c:rc(cii.rating)},{l:'Required CII',v:f2(cii.ciiReq),c:'#94A3B8'},{l:'Total CO₂',v:`${f1(cii.totalCO2)} MT`,c:'#67E8F9'}].map((k,i)=>(
           <div key={i} className={CARD}><div className="text-xs text-slate-500 uppercase">{k.l}</div><div className="text-2xl font-bold mt-1" style={{color:k.c}}>{k.v}</div></div>
         ))}
       </div>
@@ -513,7 +513,7 @@ function CiiTab({cii}) {
         </div>
         <div className="relative h-8 rounded overflow-hidden bg-slate-800">
           <div className="h-full rounded" style={{width:`${Math.min((cii.attained/(cii.bounds.D*1.4||1))*100,100)}%`,background:rc(cii.rating)}}/>
-          <div className="absolute inset-0 flex items-center px-3 text-xs font-bold text-white">Attained: {f2(cii.attained)} ({cii.rating}) — Required: {f2(cii.ciiRequired)}</div>
+          <div className="absolute inset-0 flex items-center px-3 text-xs font-bold text-white">Attained: {f2(cii.attained)} ({cii.rating}) — Required: {f2(cii.ciiReq)}</div>
         </div>
       </div>
     </div>
@@ -672,10 +672,11 @@ export function LPGDashboard() {
     apiFetch(`/lpg/monthly${qs}`).then(setData).catch(e=>setErr(e.message));
   },[vessel,days]);
 
-  if (!data && !err) return <div className="flex items-center justify-center h-screen text-slate-500">Loading…</div>;
+  if (!vessel) return <div className="flex items-center justify-center h-screen text-slate-500 text-sm">Select a vessel above to view the dashboard.</div>;
+  if (!data && !err) return <div className="flex items-center justify-center h-screen text-slate-500 text-sm">Loading…</div>;
   if (err) return <div className="p-6 text-red-400">Error: {err}</div>;
 
-  const {trend,summary} = data;
+  const {trend=[],summary={}} = data||{};
   const intv = Math.floor(trend.length/8)||1;
 
   return (
