@@ -239,7 +239,8 @@ router.post('/import/preview', authenticate, adminOnly, upload.single('file'), a
     const records = [];
     for (let i = 3; i < rows.length; i++) {
       const row = rows[i];
-      if (!row[0] || typeof row[0] !== 'number' || row[0] < 40000) continue;
+      // Accept any row with a valid Excel date serial (> 30000 = ~1982, covers all modern dates)
+      if (!row[0] || typeof row[0] !== 'number' || row[0] < 30000) continue;
       const parsed = parseRow(row, matchedVessel);
       if (!parsed.record_date) continue;
       records.push(parsed);
@@ -247,20 +248,25 @@ router.post('/import/preview', authenticate, adminOnly, upload.single('file'), a
 
     if (!records.length) return res.status(400).json({ error: 'No valid data rows found' });
 
-    // Group by voyage
-    const voyages = {};
+    // Group by month (YYYY-MM) — LPG voyages are short, monthly view is more useful
+    const months = {};
     records.forEach(r => {
-      const key = r.voyage_number || 'UNASSIGNED';
-      if (!voyages[key]) voyages[key] = { voyage_number: key, records: [], vessel_name: matchedVessel };
-      voyages[key].records.push(r);
+      const key = r.record_date.slice(0, 7); // YYYY-MM
+      if (!months[key]) months[key] = {
+        voyage_number: key,
+        month_label: new Date(key + '-15').toLocaleString('en-GB', { month: 'long', year: 'numeric' }),
+        records: [],
+        vessel_name: matchedVessel,
+      };
+      months[key].records.push(r);
     });
 
-    const voyageList = Object.values(voyages).map(v => ({
-      ...v,
-      start_date:   v.records[0]?.record_date,
-      end_date:     v.records[v.records.length-1]?.record_date,
-      record_count: v.records.length,
-      preview:      v.records.slice(0, 3),
+    const voyageList = Object.keys(months).sort().map(k => ({
+      ...months[k],
+      start_date:   months[k].records[0]?.record_date,
+      end_date:     months[k].records[months[k].records.length-1]?.record_date,
+      record_count: months[k].records.length,
+      preview:      months[k].records.slice(0, 3),
     }));
 
     res.json({ ok: true, vessel_name: matchedVessel, voyages: voyageList, total_records: records.length });
