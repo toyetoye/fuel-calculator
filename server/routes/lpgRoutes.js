@@ -97,11 +97,20 @@ async function initLpgSchema() {
       CREATE INDEX IF NOT EXISTS lpg_records_vessel_idx ON lpg_records(vessel_name);
     `);
 
-    // Seed LPG vessels if not present
+    // Seed LPG vessels config table
     await client.query(`
       INSERT INTO lpg_vessels (name, imo, dwt, vessel_type) VALUES
         ('LPG Alfred Temile',    '9859882', 5400, 'FRPG'),
         ('LPG Alfred Temile 10', '9937127', 5400, 'FRPG')
+      ON CONFLICT (name) DO NOTHING
+    `);
+    // Also seed into lng_vessels so they appear in user management / vessel assignment
+    await client.query(`
+      INSERT INTO lng_vessels (name, capacity_m3, dwt, vessel_class, foe_factor,
+        laden_boiloff_pct, ballast_boiloff_pct, cf_hfo, cf_foe, active)
+      VALUES
+        ('LPG Alfred Temile',    0, 5400, 'LPG', 0, 0, 0, 3.114, 3.206, true),
+        ('LPG Alfred Temile 10', 0, 5400, 'LPG', 0, 0, 0, 3.114, 3.206, true)
       ON CONFLICT (name) DO NOTHING
     `);
     console.log('[LPG] Schema ready');
