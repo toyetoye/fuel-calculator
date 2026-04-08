@@ -56,6 +56,7 @@ export default function VoyageDetail() {
     setNewRow({ day_number: nextDayNum, report_date: nextDate, steaming_hours: 24, total_revs: 0, distance_nm: 0, hfo_consumed: 0, foe_consumed: 0, weather_condition: '', remarks: '', excess_remarks: '' });
   };
 
+  const calcError = calc?.error || null;
   const isFinalised = voyage?.status === 'finalised';
   const canEdit = !isManager && !isFinalised;
   const inp = "px-2 py-1 rounded bg-slate-800/50 border border-white/10 text-slate-200 text-xs text-right font-mono focus:outline-none focus:border-amber-600";
@@ -64,7 +65,16 @@ export default function VoyageDetail() {
   if (loading) return <div className="flex items-center justify-center h-screen text-slate-500 text-sm">Loading...</div>;
   if (!voyage) return <div className="flex items-center justify-center h-screen text-slate-500 text-sm">Voyage not found</div>;
 
-  const processedReports = calc?.reports || [];
+  // Use calc-enriched reports if available, fall back to raw DB reports
+  const processedReports = (calc?.reports?.length > 0) ? calc.reports : reports.map(r => ({
+    ...r,
+    total_fuel: (parseFloat(r.hfo_consumed)||0) + (parseFloat(r.foe_consumed)||0),
+    avg_speed: (parseFloat(r.steaming_hours)||0) > 0 ? (parseFloat(r.distance_nm)||0) / (parseFloat(r.steaming_hours)||0) : 0,
+    interpolated_fuel: 0,
+    difference: 0,
+    is_excluded: false,
+    slip: 0,
+  }));
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -96,6 +106,13 @@ export default function VoyageDetail() {
           </button>
         ))}
       </div>
+
+      {/* Calc error banner */}
+      {calcError && (
+        <div className="rounded-lg p-3 mb-4 bg-amber-900/20 border border-amber-700/40 text-amber-300 text-sm">
+          ⚠ Calculation error: {calcError}. Noon reports shown without interpolation. Check vessel name matches LNG Vessels settings.
+        </div>
+      )}
 
       {/* NOON REPORTS TAB */}
       {tab === 'reports' && (
@@ -314,10 +331,10 @@ export default function VoyageDetail() {
       {/* CII TAB */}
       {tab === 'cii' && calc && (
         <div className="space-y-6">
-          {calc.cii_error ? (
+          {(calc.cii_error || !calc.cii_bounds) ? (
             <div className="rounded-xl p-5 border border-amber-800/30 bg-amber-900/10">
-              <p className="text-sm text-amber-300">{calc.cii_error}</p>
-              <p className="text-xs text-slate-500 mt-2">Add the vessel's DWT in LNG Vessels settings to enable CII calculation.</p>
+              <p className="text-sm text-amber-300">{calc.cii_error || calc.error || 'CII data unavailable'}</p>
+              <p className="text-xs text-slate-500 mt-2">Ensure the vessel exists in LNG Vessels settings with DWT set, then re-open this voyage.</p>
             </div>
           ) : (
             <>
