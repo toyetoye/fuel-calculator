@@ -291,6 +291,154 @@ router.get('/:voyageId/pdf', authFromQuery, async (req, res) => {
       doc.fill(r[2] || '#334155').font('Helvetica-Bold').text(r[1], 35 + evalW + 10 + evalW * 0.55, ry, { width: evalW * 0.35, align: 'right' });
     });
 
+    // ── CII Section ──────────────────────────────────────────────────────────
+    if (calc.cii_attained && calc.cii_required && calc.cii_bounds) {
+      doc.addPage();
+      y = 30;
+      const ratingColors = { A: '#059669', B: '#0891B2', C: '#D97706', D: '#EA580C', E: '#DC2626' };
+      const rColor = ratingColors[calc.cii_rating] || '#94A3B8';
+
+      // CII Header
+      doc.fill('#0F172A').rect(0, 0, pageW + 60, 50).fill();
+      doc.fill('#F8FAFC').fontSize(13).font('Helvetica-Bold').text('CII — Carbon Intensity Indicator', 30, 18);
+      doc.fill('#94A3B8').fontSize(7).font('Helvetica').text(`IMO MEPC.352(78) · ${voyage.vessel_name} · ${voyage.voyage_number}`, 30, 35);
+      y = 65;
+
+      // CII KPI row
+      const kpiW = (pageW - 30) / 4;
+      const kpis = [
+        { l: 'Attained CII', v: Number(calc.cii_attained).toFixed(2), c: rColor },
+        { l: 'CII Rating', v: calc.cii_rating, c: rColor },
+        { l: 'Required CII', v: Number(calc.cii_required).toFixed(2), c: '#94A3B8' },
+        { l: 'Total CO₂ (MT)', v: Number(calc.cii_total_co2).toFixed(1), c: '#67E8F9' },
+      ];
+      kpis.forEach((k, i) => {
+        const kx = 30 + i * kpiW;
+        doc.fill('#1E293B').rect(kx, y, kpiW - 6, 45).fill();
+        doc.fill('#64748B').fontSize(6).font('Helvetica').text(k.l.toUpperCase(), kx + 6, y + 8, { width: kpiW - 12 });
+        doc.fill(k.c).fontSize(14).font('Helvetica-Bold').text(k.v, kx + 6, y + 19, { width: kpiW - 12 });
+      });
+      y += 55;
+
+      // Rating boundaries
+      doc.fill('#1E293B').rect(30, y, pageW - 30, 18).fill();
+      const bands = [
+        { l: 'A', c: '#059669' }, { l: 'B', c: '#0891B2' }, { l: 'C', c: '#D97706' },
+        { l: 'D', c: '#EA580C' }, { l: 'E', c: '#DC2626' }
+      ];
+      const bw = (pageW - 30) / 5;
+      bands.forEach((b, i) => {
+        doc.fill(b.c).rect(30 + i * bw, y, bw, 18).fill();
+        doc.fill('#FFFFFF').fontSize(8).font('Helvetica-Bold').text(b.l, 30 + i * bw + bw / 2 - 3, y + 5);
+      });
+      y += 26;
+
+      // Boundary labels
+      const boundVals = [
+        `≤ ${Number(calc.cii_bounds.A).toFixed(2)}`,
+        `≤ ${Number(calc.cii_bounds.B).toFixed(2)}`,
+        `≤ ${Number(calc.cii_bounds.C).toFixed(2)}`,
+        `≤ ${Number(calc.cii_bounds.D).toFixed(2)}`,
+        `> ${Number(calc.cii_bounds.D).toFixed(2)}`
+      ];
+      boundVals.forEach((v, i) => {
+        doc.fill('#64748B').fontSize(6).font('Helvetica').text(v, 30 + i * bw, y, { width: bw, align: 'center' });
+      });
+      y += 18;
+
+      // CII parameters
+      const paramRows = [
+        ['Ship Type', 'LNG Carrier'],
+        ['DWT', Number(calc.cii_dwt).toLocaleString() + ' MT'],
+        ['Reference CII', Number(calc.cii_ref).toFixed(3)],
+        ['Reduction Factor', calc.cii_reduction_pct + '%'],
+        ['Required CII', Number(calc.cii_required).toFixed(3)],
+        ['CF (HFO)', String(calc.cii_cf_hfo)],
+        ['CF (LNG/FOE)', String(calc.cii_cf_foe)],
+        ['Total Distance', Number(calc.cii_total_dist).toLocaleString() + ' NM'],
+      ];
+      const halfW = (pageW - 30) / 2 - 6;
+      paramRows.forEach((row, i) => {
+        const col = i % 2;
+        const px = 30 + col * (halfW + 12);
+        if (col === 0 && i > 0) y += 13;
+        doc.fill('#1E293B').rect(px, y, halfW, 12).fill();
+        doc.fill('#64748B').fontSize(6.5).font('Helvetica').text(row[0], px + 5, y + 3, { width: halfW * 0.55 });
+        doc.fill('#E2E8F0').fontSize(6.5).font('Helvetica-Bold').text(row[1], px + halfW * 0.55, y + 3, { width: halfW * 0.42, align: 'right' });
+      });
+      y += 22;
+
+      // Daily CII table
+      if (calc.cii_daily && calc.cii_daily.length > 0) {
+        doc.fill('#0F172A').rect(30, y, pageW - 30, 13).fill();
+        const ciiCols = [
+          { h: 'Day', w: 22, align: 'center' },
+          { h: 'Date', w: 42, align: 'left' },
+          { h: 'HFO', w: 30, align: 'right' },
+          { h: 'FOE', w: 30, align: 'right' },
+          { h: 'Dist NM', w: 35, align: 'right' },
+          { h: 'Daily CO2', w: 40, align: 'right' },
+          { h: 'Daily CII', w: 35, align: 'right' },
+          { h: 'Cum CO2', w: 40, align: 'right' },
+          { h: 'Run CII', w: 35, align: 'right' },
+          { h: 'Rating', w: 28, align: 'center' },
+        ];
+        let cx = 32;
+        ciiCols.forEach(col => {
+          doc.fill('#94A3B8').fontSize(6).font('Helvetica-Bold').text(col.h, cx, y + 4, { width: col.w, align: col.align });
+          cx += col.w;
+        });
+        y += 14;
+
+        calc.cii_daily.forEach((r, ri) => {
+          if (y > 740) { doc.addPage(); y = 30; }
+          const rc = ri % 2 === 0 ? '#0F172A' : '#141E2E';
+          doc.fill(rc).rect(30, y, pageW - 30, 11).fill();
+          cx = 32;
+          const ratingColor = ratingColors[r.running_rating] || '#94A3B8';
+          const rowData = [
+            { v: String(r.day), align: 'center', c: '#FBBF24' },
+            { v: r.date ? new Date(r.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '', align: 'left', c: '#94A3B8' },
+            { v: Number(r.hfo||0).toFixed(1), align: 'right', c: '#CBD5E1' },
+            { v: Number(r.foe||0).toFixed(2), align: 'right', c: '#CBD5E1' },
+            { v: Math.round(r.dist||0).toString(), align: 'right', c: '#CBD5E1' },
+            { v: Number(r.daily_co2||0).toFixed(1), align: 'right', c: '#94A3B8' },
+            { v: Number(r.daily_cii||0).toFixed(2), align: 'right', c: '#CBD5E1' },
+            { v: Number(r.cum_co2||0).toFixed(1), align: 'right', c: '#64748B' },
+            { v: Number(r.running_cii||0).toFixed(2), align: 'right', c: ratingColor },
+            { v: r.running_rating || '', align: 'center', c: ratingColor },
+          ];
+          rowData.forEach((cell, ci) => {
+            doc.fill(cell.c).fontSize(6).font(ci === 9 ? 'Helvetica-Bold' : 'Helvetica')
+               .text(cell.v, cx, y + 3, { width: ciiCols[ci].w, align: cell.align });
+            cx += ciiCols[ci].w;
+          });
+          y += 11;
+        });
+
+        // CII totals row
+        doc.fill('#1E293B').rect(30, y, pageW - 30, 13).fill();
+        const totData = [
+          { v: 'TOTAL', align: 'center', c: '#94A3B8', w: 22 },
+          { v: '', align: 'left', c: '#94A3B8', w: 42 },
+          { v: Number(calc.total_hfo||0).toFixed(1), align: 'right', c: '#FBBF24', w: 30 },
+          { v: Number(calc.total_foe||0).toFixed(2), align: 'right', c: '#FBBF24', w: 30 },
+          { v: Math.round(calc.cii_total_dist||0).toString(), align: 'right', c: '#FBBF24', w: 35 },
+          { v: Number(calc.cii_total_co2||0).toFixed(1), align: 'right', c: '#FBBF24', w: 40 },
+          { v: '', align: 'right', c: '#94A3B8', w: 35 },
+          { v: '', align: 'right', c: '#94A3B8', w: 40 },
+          { v: Number(calc.cii_attained||0).toFixed(2), align: 'right', c: rColor, w: 35 },
+          { v: calc.cii_rating, align: 'center', c: rColor, w: 28 },
+        ];
+        cx = 32;
+        totData.forEach(cell => {
+          doc.fill(cell.c).fontSize(6.5).font('Helvetica-Bold').text(cell.v, cx, y + 4, { width: cell.w, align: cell.align });
+          cx += cell.w;
+        });
+        y += 20;
+      }
+    }
+
     // Footer
     y += 14 + 7 * 13 + 15;
     doc.fill('#94A3B8').fontSize(6).font('Helvetica').text(`Generated: ${new Date().toISOString().slice(0, 19)} · FORCAP Fleet Management System`, 30, Math.min(y, 555), { width: pageW, align: 'center' });
