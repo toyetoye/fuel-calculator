@@ -10,7 +10,7 @@ const BASE = '/api';
 const tok  = () => localStorage.getItem('fuel_token');
 const apiFetch = (path, opts={}) =>
   fetch(BASE + path, { ...opts, headers: { 'Content-Type':'application/json', Authorization:`Bearer ${tok()}`, ...opts.headers } })
-    .then(r => r.json());
+    .then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error||r.statusText); return d; });
 
 const f2  = n => Number(n||0).toFixed(2);
 const f1  = n => Number(n||0).toFixed(1);
