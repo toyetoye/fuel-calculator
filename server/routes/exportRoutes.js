@@ -48,12 +48,20 @@ function drawPageHeader(doc, voyageName, pageLabel) {
      .text(voyageName, MARGIN + 200, MARGIN + 8, { width: 340, align: 'center', lineBreak: false });
   doc.fill('#94A3B8').fontSize(6).font('Helvetica')
      .text(pageLabel, MARGIN + 200, MARGIN + 20, { width: 340, align: 'center', lineBreak: false });
-  // NSML logo box right
-  doc.fill('#003087').rect(PAGE_W - MARGIN - 80, MARGIN + 4, 76, 28).fill();
-  doc.fill('#FFFFFF').fontSize(11).font('Helvetica-Bold')
-     .text('NSML', PAGE_W - MARGIN - 76, MARGIN + 8, { width: 68, align: 'center', lineBreak: false });
-  doc.fill('#94A3B8').fontSize(5).font('Helvetica')
-     .text('NIGERIAN SHORELINE MARINE', PAGE_W - MARGIN - 76, MARGIN + 22, { width: 68, align: 'center', lineBreak: false });
+  // NSML logo — embed from server assets
+  try {
+    const path = require('path');
+    const fs = require('fs');
+    const logoPath = path.join(__dirname, '../assets/nsml_logo.jpg');
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, PAGE_W - MARGIN - 70, MARGIN + 2, { height: 32, fit: [70, 32] });
+    }
+  } catch(e) {
+    // fallback text if image fails
+    doc.fill('#003087').rect(PAGE_W - MARGIN - 70, MARGIN + 2, 66, 32).fill();
+    doc.fill('#FFFFFF').fontSize(11).font('Helvetica-Bold')
+       .text('NSML', PAGE_W - MARGIN - 66, MARGIN + 10, { width: 58, align: 'center', lineBreak: false });
+  }
 }
 
 function drawPageFooter(doc, pageNum, totalPages) {
