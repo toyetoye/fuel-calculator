@@ -1,6 +1,7 @@
 const express = require('express');
 const { pool } = require('../db');
 const PDFDocument = require('pdfkit');
+const https = require('https');
 const router = express.Router();
 
 // Auth via query param
@@ -21,6 +22,51 @@ function interpolateFuel(curve, speed) {
   return result;
 }
 
+const fmt  = (n, d = 2) => Number(n || 0).toFixed(d);
+const fmt0 = n => fmt(n, 0);
+const fmtC = n => '$' + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+// ── Layout constants ─────────────────────────────────────────────────────────
+const PAGE_W  = 842;         // A4 landscape width (pt)
+const PAGE_H  = 595;         // A4 landscape height (pt)
+const MARGIN  = 30;
+const CONTENT = PAGE_W - MARGIN * 2;  // 782
+const FOOTER_H = 20;
+const CONTENT_BOTTOM = PAGE_H - MARGIN - FOOTER_H;  // 545 — safe bottom
+
+// ── Header / Footer helpers ───────────────────────────────────────────────────
+function drawPageHeader(doc, voyageName, pageLabel) {
+  // Dark bar
+  doc.fill('#1E293B').rect(MARGIN, MARGIN, CONTENT, 36).fill();
+  // FORCAP brand left
+  doc.fill('#F59E0B').fontSize(9).font('Helvetica-Bold')
+     .text('FORCAP', MARGIN + 8, MARGIN + 6, { lineBreak: false });
+  doc.fill('#94A3B8').fontSize(6).font('Helvetica')
+     .text('Fleet Operations, Risk, Compliance & Audit Platform', MARGIN + 8, MARGIN + 18, { lineBreak: false });
+  // Voyage info centre
+  doc.fill('#E2E8F0').fontSize(8).font('Helvetica-Bold')
+     .text(voyageName, MARGIN + 200, MARGIN + 8, { width: 340, align: 'center', lineBreak: false });
+  doc.fill('#94A3B8').fontSize(6).font('Helvetica')
+     .text(pageLabel, MARGIN + 200, MARGIN + 20, { width: 340, align: 'center', lineBreak: false });
+  // NSML logo box right
+  doc.fill('#003087').rect(PAGE_W - MARGIN - 80, MARGIN + 4, 76, 28).fill();
+  doc.fill('#FFFFFF').fontSize(11).font('Helvetica-Bold')
+     .text('NSML', PAGE_W - MARGIN - 76, MARGIN + 8, { width: 68, align: 'center', lineBreak: false });
+  doc.fill('#94A3B8').fontSize(5).font('Helvetica')
+     .text('NIGERIAN SHORELINE MARINE', PAGE_W - MARGIN - 76, MARGIN + 22, { width: 68, align: 'center', lineBreak: false });
+}
+
+function drawPageFooter(doc, pageNum, totalPages) {
+  const fy = PAGE_H - MARGIN - 12;
+  doc.fill('#E2E8F0').rect(MARGIN, fy, CONTENT, 0.5).fill();
+  // Left: FORCAP® 2026
+  doc.fill('#64748B').fontSize(6).font('Helvetica')
+     .text('FORCAP\xAE 2026  \u2014  Confidential \u2014 For Internal Use Only', MARGIN, fy + 4, { lineBreak: false });
+  // Right: page number
+  doc.fill('#64748B').fontSize(6).font('Helvetica')
+     .text(`Page ${pageNum} of ${totalPages}`, MARGIN, fy + 4, { width: CONTENT, align: 'right', lineBreak: false });
+}
+
 router.get('/:voyageId/pdf', authFromQuery, async (req, res) => {
   try {
     const voy = await pool.query('SELECT * FROM voyages WHERE id=$1', [req.params.voyageId]);
@@ -28,11 +74,9 @@ router.get('/:voyageId/pdf', authFromQuery, async (req, res) => {
     const voyage = voy.rows[0];
     const reports = (await pool.query('SELECT * FROM noon_reports WHERE voyage_id=$1 ORDER BY day_number', [req.params.voyageId])).rows;
 
-    // Get vessel specs
     const vesselR = await pool.query('SELECT * FROM lng_vessels WHERE name=$1', [voyage.vessel_name]);
-    const vessel = vesselR.rows[0];
+    const vessel  = vesselR.rows[0];
 
-    // Get curve
     const legType = (voyage.leg_type || 'BALLAST').toUpperCase();
     let curve = [];
     if (vessel) {
@@ -40,431 +84,365 @@ router.get('/:voyageId/pdf', authFromQuery, async (req, res) => {
       curve = curveR.rows.map(r => ({ speed: parseFloat(r.speed), fuel: parseFloat(r.fuel) }));
     }
 
-    // Get exclusions
     const exclR = await pool.query('SELECT name, excluded FROM exclusion_items');
     const exclMap = {};
     exclR.rows.forEach(e => { exclMap[e.name.toUpperCase()] = e.excluded; });
 
-    // Process reports
-    let totHrs = 0, totDist = 0, totHFO = 0, totFOE = 0, totFO = 0, totGuar = 0;
-    let exclTime = 0, exclHFO = 0, exclFO = 0, exclDist = 0;
+    // ── Process reports ───────────────────────────────────────────────────────
+    let totHrs=0, totDist=0, totHFO=0, totFOE=0, totFO=0, totGuar=0;
+    let exclTime=0, exclHFO=0, exclFO=0, exclDist=0;
     const processed = reports.map(r => {
-      const hrs = parseFloat(r.steaming_hours) || 0;
-      const dist = parseFloat(r.distance_nm) || 0;
-      const hfo = parseFloat(r.hfo_consumed) || 0;
-      const foe = parseFloat(r.foe_consumed) || 0;
+      const hrs   = parseFloat(r.steaming_hours) || 0;
+      const dist  = parseFloat(r.distance_nm)    || 0;
+      const hfo   = parseFloat(r.hfo_consumed)   || 0;
+      const foe   = parseFloat(r.foe_consumed)   || 0;
       const total = hfo + foe;
       const speed = hrs > 0 ? dist / hrs : 0;
-      const guar = interpolateFuel(curve, speed);
-      const diff = guar - total;
-      const wKey = (r.weather_condition || '').toUpperCase().trim();
-      const excl = exclMap[wKey] || false;
-      totHrs += hrs; totDist += dist; totHFO += hfo; totFOE += foe; totFO += total; totGuar += guar;
-      if (excl) { exclTime += hrs; exclHFO += hfo; exclFO += total; exclDist += dist; }
+      const guar  = interpolateFuel(curve, speed);
+      const diff  = guar - total;
+      const wKey  = (r.weather_condition || '').toUpperCase().trim();
+      const excl  = exclMap[wKey] || false;
+      totHrs+=hrs; totDist+=dist; totHFO+=hfo; totFOE+=foe; totFO+=total; totGuar+=guar;
+      if (excl) { exclTime+=hrs; exclHFO+=hfo; exclFO+=total; exclDist+=dist; }
       return { ...r, hrs, dist, hfo, foe, total, speed, guar, diff, excl };
     });
 
-    // Passage calcs
-    const faop = voyage.faop_time ? new Date(voyage.faop_time) : null;
-    const eosp = voyage.eosp_time ? new Date(voyage.eosp_time) : null;
+    // ── Passage calcs ─────────────────────────────────────────────────────────
+    const faop     = voyage.faop_time ? new Date(voyage.faop_time) : null;
+    const eosp     = voyage.eosp_time ? new Date(voyage.eosp_time) : null;
     const passDays = faop && eosp ? (eosp - faop) / (1000*60*60*24) : 0;
-    const passHrs = passDays * 24;
+    const passHrs  = passDays * 24;
 
-    // FOE calcs
-    const capacity = vessel ? parseFloat(vessel.capacity_m3) : 0;
-    const foeFactor = vessel ? parseFloat(vessel.foe_factor) : 0.484;
-    const boilRate = vessel ? (legType === 'LADEN' ? parseFloat(vessel.laden_boiloff_pct) : parseFloat(vessel.ballast_boiloff_pct)) / 100 : 0;
-    const dailyBoilM3 = boilRate * capacity;
-    const dailyFOE = dailyBoilM3 * foeFactor;
-
-    const gaugAfterM3 = parseFloat(voyage.gauging_after_m3) || 0;
+    const capacity  = vessel ? parseFloat(vessel.capacity_m3) : 0;
+    const foeFactor = vessel ? parseFloat(vessel.foe_factor)  : 0.484;
+    const boilRate  = vessel ? (legType==='LADEN' ? parseFloat(vessel.laden_boiloff_pct) : parseFloat(vessel.ballast_boiloff_pct)) / 100 : 0;
+    const gaugAfterM3  = parseFloat(voyage.gauging_after_m3)  || 0;
     const gaugBeforeM3 = parseFloat(voyage.gauging_before_m3) || 0;
     const boilConsumed = gaugAfterM3 - gaugBeforeM3;
-    const n2Comp = boilConsumed * 0.005;
-    const netBoil = boilConsumed - n2Comp;
-    const passFOE = netBoil * foeFactor;
+    const passFOE      = (boilConsumed - boilConsumed * 0.005) * foeFactor;
 
-    // Net passage
-    const netHrs = totHrs - exclTime;
-    const netDist = totDist - exclDist;
-    const netHFO = totHFO - exclHFO;
-    const avgSpeed = netHrs > 0 ? netDist / netHrs : 0;
-    const guarDaily = interpolateFuel(curve, avgSpeed);
-    const guarPassFuel = guarDaily * (netHrs / 24);
+    const netHrs      = totHrs - exclTime;
+    const netDist     = totDist - exclDist;
+    const netHFO      = totHFO - exclHFO;
+    const avgSpeed    = netHrs > 0 ? netDist / netHrs : 0;
+    const guarDaily   = interpolateFuel(curve, avgSpeed);
+    const guarPassFuel= guarDaily * (netHrs / 24);
 
-    const harbourBefore = faop && voyage.gauging_after_time ? Math.abs((faop - new Date(voyage.gauging_after_time)) / (1000*60*60*24)) : 0;
-    const harbourAfter = eosp && voyage.gauging_before_time ? Math.abs((new Date(voyage.gauging_before_time) - eosp) / (1000*60*60*24)) : 0;
-    const totalHarbour = harbourBefore + harbourAfter;
-    const totalExclDays = (exclTime / 24) + totalHarbour;
+    const harbourBefore  = faop && voyage.gauging_after_time  ? Math.abs((faop - new Date(voyage.gauging_after_time))  / (1000*60*60*24)) : 0;
+    const harbourAfter   = eosp && voyage.gauging_before_time ? Math.abs((new Date(voyage.gauging_before_time) - eosp) / (1000*60*60*24)) : 0;
+    const totalHarbour   = harbourBefore + harbourAfter;
+    const totalExclDays  = (exclTime / 24) + totalHarbour;
     const actualDailyFOE = passDays > 0 ? passFOE / passDays : 0;
-    const netFOE = passFOE - (totalExclDays * actualDailyFOE);
-    const netTotal = netHFO + netFOE;
-    const excess = netTotal - guarPassFuel;
-    const hfoPrice = parseFloat(voyage.hfo_price) || 0;
-    const excessCost = excess * hfoPrice;
+    const netFOE         = passFOE - (totalExclDays * actualDailyFOE);
+    const netTotal       = netHFO + netFOE;
+    const excess         = netTotal - guarPassFuel;
+    const hfoPrice       = parseFloat(voyage.hfo_price) || 0;
+    const excessCost     = excess * hfoPrice;
 
-    // Simple comparison
-    const simpleExcess = totFO - totGuar;
-    const simpleExclFO = exclFO - processed.filter(r => r.excl).reduce((s, r) => s + r.guar, 0);
-    const simpleReimb = simpleExcess - simpleExclFO;
-    const simpleCost = simpleReimb * hfoPrice;
+    const simpleExcess  = totFO - totGuar;
+    const simpleExclFO  = exclFO - processed.filter(r=>r.excl).reduce((s,r)=>s+r.guar,0);
+    const simpleReimb   = simpleExcess - simpleExclFO;
+    const simpleCost    = simpleReimb * hfoPrice;
 
-    // ── BUILD PDF ──
-    const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+    // ── CII calc ──────────────────────────────────────────────────────────────
+    const ciiDwt   = vessel ? parseFloat(vessel.dwt) || 0 : 0;
+    const ciiCfHfo = vessel ? parseFloat(vessel.cf_hfo) || 3.114 : 3.114;
+    const ciiCfFoe = vessel ? parseFloat(vessel.cf_foe) || 2.750 : 2.750;
+    const ciiRef   = 9.827;
+    const ciiYear  = new Date().getFullYear();
+    const ciiZ     = ({2023:5,2024:5,2025:7,2026:9,2027:11,2028:11,2029:11,2030:11})[ciiYear] || 9;
+    const ciiRequired = ciiRef * (1 - ciiZ / 100);
+    const ciiBounds   = { A: ciiRequired*0.82, B: ciiRequired*0.93, C: ciiRequired*1.14, D: ciiRequired*1.34 };
+    const getCiiRating = v => v<=ciiBounds.A?'A':v<=ciiBounds.B?'B':v<=ciiBounds.C?'C':v<=ciiBounds.D?'D':'E';
+
+    let cumCO2=0, cumDist2=0;
+    processed.forEach(r => { cumCO2 += (r.hfo*ciiCfHfo)+(r.foe*ciiCfFoe); cumDist2 += r.dist; });
+    const ciiAttained = cumDist2>0 ? (cumCO2*1000000)/(ciiDwt*cumDist2) : 0;
+    const ciiRating   = getCiiRating(ciiAttained);
+
+    // ── Page count estimate (reports per page) ────────────────────────────────
+    const REPORT_START_Y  = 100;  // y after header + voyage info
+    const ROW_H           = 12;
+    const TABLE_HDR_H     = 16;
+    const ROWS_PER_PAGE   = Math.floor((CONTENT_BOTTOM - REPORT_START_Y - TABLE_HDR_H) / ROW_H); // ~36
+    const reportPages     = Math.ceil(processed.length / ROWS_PER_PAGE);
+    const summaryPages    = 1;
+    const ciiPages        = ciiDwt > 0 ? 1 : 0;
+    const totalPages      = reportPages + summaryPages + ciiPages;
+
+    const voyageName = `${voyage.vessel_name}  ·  Voy ${voyage.voyage_number}  ·  ${legType}`;
+
+    // ── Build PDF ─────────────────────────────────────────────────────────────
+    const doc = new PDFDocument({ margin: MARGIN, size: 'A4', layout: 'landscape', autoFirstPage: false });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=Excess_Fuel_${voyage.voyage_number.replace(/\//g, '_')}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=Excess_Fuel_${voyage.voyage_number.replace(/\//g,'_')}.pdf`);
     doc.pipe(res);
 
-    const fmt = (n, d = 2) => Number(n || 0).toFixed(d);
-    const fmt0 = n => fmt(n, 0);
-    const fmtC = n => '$' + Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
-    const pageW = 842 - 60; // A4 landscape minus margins
+    let currentPage = 0;
+    function newPage(label) {
+      currentPage++;
+      doc.addPage();
+      drawPageHeader(doc, voyageName, label);
+      drawPageFooter(doc, currentPage, totalPages);
+      return REPORT_START_Y; // return starting y for content
+    }
 
-    // ── HEADER ──
-    doc.rect(30, 30, pageW, 45).fill('#1E293B');
-    doc.fill('#F59E0B').fontSize(14).font('Helvetica-Bold').text('EXCESS FUEL CALCULATION REPORT', 40, 42, { width: pageW - 20 });
-    doc.fill('#94A3B8').fontSize(8).text(`${voyage.vessel_name} — Voy: ${voyage.voyage_number} — ${voyage.leg_type}`, 40, 60, { width: pageW - 20 });
-    doc.fill('#000000');
-
-    // ── VOYAGE INFO BOX ──
-    let y = 85;
-    doc.rect(30, y, pageW, 55).fill('#F8FAFC').stroke('#E2E8F0');
-    doc.fill('#334155').fontSize(7).font('Helvetica');
-    const info = [
-      [`Vessel: ${voyage.vessel_name}`, `Voyage: ${voyage.voyage_number}`, `Leg: ${voyage.leg_type}`, `Status: ${voyage.status.toUpperCase()}`],
-      [`Discharge Port: ${voyage.discharge_port || '—'}`, `Loading Port: ${voyage.loading_port || '—'}`, `HFO Price: ${hfoPrice > 0 ? '$' + hfoPrice + '/MT' : 'Not set'}`, `Class: ${vessel?.vessel_class || '—'}`],
-      [`FAOP: ${faop ? faop.toISOString().slice(0, 16).replace('T', ' ') : '—'} ${voyage.faop_timezone || ''}`, `EOSP: ${eosp ? eosp.toISOString().slice(0, 16).replace('T', ' ') : '—'} ${voyage.eosp_timezone || ''}`, `Passage: ${fmt(passDays, 1)} days (${fmt0(passHrs)} hrs)`, `Distance: ${fmt0(totDist)} NM`],
-    ];
-    info.forEach((row, ri) => {
-      row.forEach((cell, ci) => {
-        doc.text(cell, 40 + ci * 195, y + 5 + ri * 16, { width: 190 });
-      });
-    });
-
-    // ── NOON REPORTS TABLE ──
-    y = 150;
-    doc.rect(30, y, pageW, 16).fill('#1E293B');
+    // ── PAGE 1+: NOON REPORTS ─────────────────────────────────────────────────
     const cols = [
-      { h: 'Day', w: 28, a: 'right' }, { h: 'Date', w: 58, a: 'left' }, { h: 'Hrs', w: 32, a: 'right' },
-      { h: 'Revs', w: 42, a: 'right' }, { h: 'Dist', w: 36, a: 'right' }, { h: 'HFO', w: 34, a: 'right' },
-      { h: 'FOE', w: 42, a: 'right' }, { h: 'Total FO', w: 44, a: 'right' }, { h: 'Speed', w: 36, a: 'right' },
-      { h: 'Guar.', w: 40, a: 'right' }, { h: 'Diff', w: 40, a: 'right' }, { h: 'Excl', w: 28, a: 'center' },
-      { h: 'Weather / Remarks', w: 190, a: 'left' }, { h: 'Slip', w: 36, a: 'right' },
+      { h:'Day',   w:26, a:'right'  },
+      { h:'Date',  w:54, a:'left'   },
+      { h:'Hrs',   w:30, a:'right'  },
+      { h:'Revs',  w:40, a:'right'  },
+      { h:'Dist',  w:34, a:'right'  },
+      { h:'HFO',   w:32, a:'right'  },
+      { h:'FOE',   w:40, a:'right'  },
+      { h:'Total', w:42, a:'right'  },
+      { h:'Speed', w:34, a:'right'  },
+      { h:'Guar.', w:38, a:'right'  },
+      { h:'Diff',  w:38, a:'right'  },
+      { h:'X',     w:16, a:'center' },
+      { h:'Weather / Remarks', w:186, a:'left' },
+      { h:'Slip',  w:34, a:'right'  },
     ];
 
+    let y = newPage('NOON REPORTS — Excess Fuel Calculation');
+
+    // Table header
+    doc.fill('#1E293B').rect(MARGIN, y, CONTENT, TABLE_HDR_H).fill();
+    let x = MARGIN + 4;
     doc.fill('#F59E0B').fontSize(6).font('Helvetica-Bold');
-    let x = 35;
-    cols.forEach(c => { doc.text(c.h, x, y + 4, { width: c.w, align: c.a }); x += c.w + 2; });
-    y += 16;
+    cols.forEach(c => {
+      doc.text(c.h, x, y + 5, { width: c.w, align: c.a, lineBreak: false });
+      x += c.w + 1;
+    });
+    y += TABLE_HDR_H;
 
     // Data rows
-    doc.font('Helvetica').fontSize(6);
     processed.forEach((r, i) => {
-      if (y > 530) { doc.addPage(); y = 40; }
-      if (r.excl) doc.rect(30, y, pageW, 13).fill('#FEF2F2');
-      else if (i % 2 === 0) doc.rect(30, y, pageW, 13).fill('#F8FAFC');
-      else doc.rect(30, y, pageW, 13).fill('#FFFFFF');
+      if (y + ROW_H > CONTENT_BOTTOM) {
+        y = newPage('NOON REPORTS (continued)');
+        // Repeat table header
+        doc.fill('#1E293B').rect(MARGIN, y, CONTENT, TABLE_HDR_H).fill();
+        x = MARGIN + 4;
+        doc.fill('#F59E0B').fontSize(6).font('Helvetica-Bold');
+        cols.forEach(c => { doc.text(c.h, x, y + 5, { width: c.w, align: c.a, lineBreak: false }); x += c.w + 1; });
+        y += TABLE_HDR_H;
+      }
+      const bg = r.excl ? '#FEF2F2' : (i % 2 === 0 ? '#F8FAFC' : '#FFFFFF');
+      doc.fill(bg).rect(MARGIN, y, CONTENT, ROW_H).fill();
 
-      doc.fill('#334155');
       const slip = vessel?.pitch && r.hrs > 0 ? (((r.total_revs * parseFloat(vessel.pitch)) / 1800) - r.dist) / 100 : 0;
-      const weatherRem = [r.weather_condition, r.remarks].filter(Boolean).join(' — ');
+      const weatherRem = [r.weather_condition, r.remarks].filter(Boolean).join(' — ').slice(0, 55);
       const vals = [
-        r.day_number, r.report_date ? new Date(r.report_date).toISOString().slice(0, 10) : '',
-        fmt(r.hrs, 1), fmt0(r.total_revs), fmt0(r.dist), fmt(r.hfo, 1), fmt(r.foe), fmt(r.total),
-        fmt(r.speed, 1), fmt(r.guar), (r.diff >= 0 ? '+' : '') + fmt(r.diff), r.excl ? 'YES' : '',
-        weatherRem.slice(0, 50), fmt(slip, 2)
+        r.day_number,
+        r.report_date ? new Date(r.report_date).toISOString().slice(0,10) : '',
+        fmt(r.hrs, 1), fmt0(r.total_revs), fmt0(r.dist),
+        fmt(r.hfo, 1), fmt(r.foe), fmt(r.total),
+        fmt(r.speed, 1), fmt(r.guar),
+        (r.diff >= 0 ? '+' : '') + fmt(r.diff),
+        r.excl ? 'X' : '',
+        weatherRem,
+        fmt(slip, 2),
       ];
 
-      x = 35;
+      x = MARGIN + 4;
+      doc.fontSize(6).font('Helvetica');
       vals.forEach((v, vi) => {
-        if (vi === 10) { // Diff column - color code
-          doc.fill(r.diff >= 0 ? '#16A34A' : '#DC2626');
-        } else if (vi === 11 && r.excl) {
-          doc.fill('#DC2626');
-        } else {
-          doc.fill('#334155');
-        }
-        doc.text(String(v), x, y + 3, { width: cols[vi].w, align: cols[vi].a });
-        x += cols[vi].w + 2;
+        const isExcl  = vi === 11 && r.excl;
+        const isDiff  = vi === 10;
+        const color   = isDiff ? (r.diff >= 0 ? '#16A34A' : '#DC2626') : isExcl ? '#DC2626' : '#334155';
+        doc.fill(color).text(String(v), x, y + 3, { width: cols[vi].w, align: cols[vi].a, lineBreak: false });
+        x += cols[vi].w + 1;
       });
-      y += 13;
+      y += ROW_H;
     });
 
     // Totals row
-    doc.rect(30, y, pageW, 15).fill('#1E293B');
-    doc.fill('#F59E0B').font('Helvetica-Bold').fontSize(6);
-    x = 35;
-    const totVals = ['', 'TOTALS', fmt(totHrs, 1), '', fmt0(totDist), fmt(totHFO, 1), fmt(totFOE), fmt(totFO), '', fmt(totGuar), (totFO - totGuar >= 0 ? '+' : '') + fmt(totFO - totGuar), '', '', ''];
-    totVals.forEach((v, vi) => { doc.text(String(v), x, y + 4, { width: cols[vi].w, align: cols[vi].a }); x += cols[vi].w + 2; });
-    y += 20;
+    doc.fill('#1E293B').rect(MARGIN, y, CONTENT, 14).fill();
+    const totVals = ['', 'TOTALS', fmt(totHrs,1), '', fmt0(totDist), fmt(totHFO,1), fmt(totFOE), fmt(totFO), '', fmt(totGuar), (totFO-totGuar>=0?'+':'')+fmt(totFO-totGuar), '', '', ''];
+    x = MARGIN + 4;
+    doc.fill('#F59E0B').fontSize(6).font('Helvetica-Bold');
+    totVals.forEach((v, vi) => { doc.text(String(v), x, y + 4, { width: cols[vi].w, align: cols[vi].a, lineBreak: false }); x += cols[vi].w + 1; });
+    y += 18;
 
-    // ── SUMMARY SECTIONS ──
-    if (y > 430) { doc.addPage(); y = 40; }
+    // ── SUMMARY PAGE ─────────────────────────────────────────────────────────
+    y = newPage('VOYAGE SUMMARY — FOE / Boil-Off & Passage Evaluation');
 
-    const boxW = (pageW - 20) / 3;
-    const drawBox = (bx, by, title, rows) => {
-      doc.rect(bx, by, boxW, 14 + rows.length * 12).fill('#F8FAFC').stroke('#E2E8F0');
-      doc.rect(bx, by, boxW, 14).fill('#1E293B');
-      doc.fill('#F59E0B').fontSize(7).font('Helvetica-Bold').text(title, bx + 5, by + 3, { width: boxW - 10 });
-      doc.font('Helvetica').fontSize(6).fill('#334155');
+    // Three info boxes row 1
+    const boxW = (CONTENT - 16) / 3;
+    const drawBox = (bx, by, title, rows, accentColor) => {
+      const bh = 14 + rows.length * 13;
+      doc.fill('#F8FAFC').rect(bx, by, boxW, bh).fill();
+      doc.fill(accentColor || '#1E293B').rect(bx, by, boxW, 14).fill();
+      doc.fill('#FBBF24').fontSize(7).font('Helvetica-Bold')
+         .text(title, bx+5, by+4, { width: boxW-10, lineBreak: false });
       rows.forEach((r, i) => {
-        const ry = by + 18 + i * 12;
-        doc.text(r[0], bx + 5, ry, { width: boxW * 0.6 });
-        const color = r[2] || '#334155';
-        doc.fill(color).font('Helvetica-Bold').text(r[1], bx + boxW * 0.6, ry, { width: boxW * 0.35, align: 'right' });
-        doc.fill('#334155').font('Helvetica');
+        const ry = by + 17 + i * 13;
+        doc.fill('#475569').fontSize(6.5).font('Helvetica')
+           .text(r[0], bx+5, ry, { width: boxW*0.58, lineBreak: false });
+        doc.fill(r[2] || '#1E293B').fontSize(6.5).font('Helvetica-Bold')
+           .text(r[1], bx + boxW*0.58, ry, { width: boxW*0.38, align:'right', lineBreak: false });
       });
+      return bh;
     };
 
-    // Passage data
-    drawBox(30, y, 'PASSAGE DATA', [
-      ['Passage Duration (Days)', fmt(passDays, 2)],
-      ['Passage Duration (Hrs)', fmt0(passHrs)],
-      ['Total Distance (NM)', fmt0(totDist)],
-      ['Total HFO (MT)', fmt(totHFO, 1)],
-      ['Total FOE (MT)', fmt(totFOE)],
-      ['Total FO (MT)', fmt(totFO)],
+    const bh1 = drawBox(MARGIN,          y, 'PASSAGE DATA', [
+      ['Passage Duration (Days)', fmt(passDays)],
+      ['Passage Hours',           fmt(passHrs,1)],
+      ['Total Distance (NM)',     fmt0(totDist)],
+      ['Total HFO (MT)',          fmt(totHFO,1)],
+      ['Total FOE (MT)',          fmt(totFOE)],
+      ['Total FO (MT)',           fmt(totFO)],
     ]);
-
-    // Exclusions
-    drawBox(30 + boxW + 10, y, 'EXCLUSIONS', [
-      ['Harbour Period (Days)', fmt(totalHarbour, 3)],
-      ['Excluded Time (Hrs)', fmt(exclTime, 1)],
-      ['Excluded HFO (MT)', fmt(exclHFO, 1)],
-      ['Excluded FO (MT)', fmt(exclFO)],
-      ['Excluded Distance (NM)', fmt0(exclDist)],
-      ['Total Exclusion (Days)', fmt(totalExclDays, 3)],
+    drawBox(MARGIN + boxW + 8,  y, 'EXCLUSIONS', [
+      ['Harbour Period (Days)',   fmt(totalHarbour,3)],
+      ['Excluded Time (Hrs)',     fmt(exclTime,1)],
+      ['Excluded HFO (MT)',       fmt(exclHFO,1)],
+      ['Excluded FO (MT)',        fmt(exclFO)],
+      ['Excluded Distance (NM)', fmt0(totDist - netDist)],
+      ['Total Excl. (Days)',      fmt(totalExclDays,3)],
     ]);
-
-    // FOE
-    drawBox(30 + (boxW + 10) * 2, y, 'FOE / BOIL-OFF', [
-      ['Capacity (M³)', fmt0(capacity)],
-      ['Boil-off Rate (%/day)', fmt(boilRate * 100, 2) + '%'],
-      ['Gauging After (M³)', fmt(gaugAfterM3, 3)],
-      ['Gauging Before (M³)', fmt(gaugBeforeM3, 3)],
-      ['Boil-off (M³)', fmt(boilConsumed, 3)],
-      ['Passage FOE (MT)', fmt(passFOE)],
+    drawBox(MARGIN + (boxW+8)*2, y, 'FOE / BOIL-OFF', [
+      ['Capacity (M³)',           fmt0(capacity)],
+      ['Boil-off Rate (%/day)',   fmt(boilRate*100,2)+'%'],
+      ['Gauging After (M³)',      fmt(gaugAfterM3,3)],
+      ['Gauging Before (M³)',     fmt(gaugBeforeM3,3)],
+      ['Boil-off Consumed (M³)', fmt(boilConsumed,3)],
+      ['Passage FOE (MT)',        fmt(passFOE)],
     ]);
+    y += bh1 + 12;
 
-    y += 14 + 6 * 12 + 15;
-    if (y > 480) { doc.addPage(); y = 40; }
+    // Evaluation boxes row 2
+    const evalW = (CONTENT - 8) / 2;
+    const drawEvalBox = (bx, by, title, rows, accent) => {
+      const bh = 14 + rows.length * 14;
+      doc.fill('#FFFBEB').rect(bx, by, evalW, bh).fill();
+      doc.fill(accent || '#92400E').rect(bx, by, evalW, 14).fill();
+      doc.fill('#FDE68A').fontSize(7.5).font('Helvetica-Bold')
+         .text(title, bx+6, by+4, { width: evalW-12, lineBreak: false });
+      rows.forEach((r, i) => {
+        const ry = by + 18 + i * 14;
+        doc.fill('#334155').fontSize(7).font('Helvetica')
+           .text(r[0], bx+6, ry, { width: evalW*0.6, lineBreak: false });
+        doc.fill(r[2] || '#334155').font('Helvetica-Bold')
+           .text(r[1], bx + evalW*0.6, ry, { width: evalW*0.36, align:'right', lineBreak: false });
+      });
+      return bh;
+    };
 
-    // Evaluation boxes
-    const evalW = (pageW - 10) / 2;
-    // Speed-based
-    doc.rect(30, y, evalW, 14 + 7 * 13).fill('#FFFBEB').stroke('#FDE68A');
-    doc.rect(30, y, evalW, 14).fill('#92400E');
-    doc.fill('#FDE68A').fontSize(8).font('Helvetica-Bold').text('PASSAGE EVALUATION (Speed-Based)', 35, y + 3, { width: evalW - 10 });
-    doc.font('Helvetica').fontSize(7).fill('#334155');
-    const evalRows = [
-      ['Average Speed (Knots)', fmt(avgSpeed, 2)],
+    const red='#DC2626', grn='#16A34A';
+    drawEvalBox(MARGIN, y, 'PASSAGE EVALUATION (Speed-Based)', [
+      ['Average Speed (Knots)',          fmt(avgSpeed,2)],
       ['Guaranteed Daily Fuel (MT/day)', fmt(guarDaily)],
-      ['Net Duration (Hrs)', fmt(netHrs, 1)],
-      ['Guaranteed Passage Fuel (MT)', fmt(guarPassFuel)],
-      ['Net Passage Fuel (MT)', fmt(netTotal)],
-      ['Excess Fuel (MT)', fmt(excess), excess > 0 ? '#DC2626' : '#16A34A'],
-      ['Excess Cost ($)', fmtC(excessCost), excessCost > 0 ? '#DC2626' : '#16A34A'],
-    ];
-    evalRows.forEach((r, i) => {
-      const ry = y + 18 + i * 13;
-      doc.fill('#334155').font('Helvetica').text(r[0], 35, ry, { width: evalW * 0.6 });
-      doc.fill(r[2] || '#334155').font('Helvetica-Bold').text(r[1], 35 + evalW * 0.55, ry, { width: evalW * 0.35, align: 'right' });
-    });
+      ['Net Duration (Hrs)',             fmt(netHrs,1)],
+      ['Guaranteed Passage Fuel (MT)',   fmt(guarPassFuel)],
+      ['Net Passage Fuel (MT)',          fmt(netTotal)],
+      ['Excess Fuel (MT)',               fmt(excess),   excess>0?red:grn],
+      ['Reimbursable Excess (MT)',       fmt(excess),   excess>0?red:grn],
+      ['HFO Price ($/MT)',               hfoPrice>0?'$'+hfoPrice+'/MT':'Not set'],
+      ['Excess Cost',                    fmtC(excessCost), excessCost>0?red:grn],
+    ]);
+    drawEvalBox(MARGIN + evalW + 8, y, 'SIMPLE COMPARISON (Actual vs Guaranteed)', [
+      ['Actual FO Consumed (MT)',   fmt(totFO)],
+      ['Guaranteed FO (MT)',        fmt(totGuar)],
+      ['Simple Excess (MT)',        fmt(simpleExcess),  simpleExcess>0?red:grn],
+      ['Excluded FO (MT)',          fmt(exclFO)],
+      ['Excl. Guaranteed (MT)',     fmt(exclFO - simpleExclFO - simpleExclFO + exclFO)],
+      ['Reimbursable Excess (MT)', fmt(simpleReimb),   simpleReimb>0?red:grn],
+      ['HFO Price ($/MT)',          hfoPrice>0?'$'+hfoPrice+'/MT':'Not set'],
+      ['',                          ''],
+      ['Reimbursable Cost',         fmtC(simpleCost),   simpleCost>0?red:grn],
+    ]);
 
-    // Simple comparison
-    doc.rect(30 + evalW + 10, y, evalW, 14 + 7 * 13).fill('#FFFBEB').stroke('#FDE68A');
-    doc.rect(30 + evalW + 10, y, evalW, 14).fill('#92400E');
-    doc.fill('#FDE68A').fontSize(8).font('Helvetica-Bold').text('SIMPLE COMPARISON (Actual vs Interpolated)', 35 + evalW + 10, y + 3, { width: evalW - 10 });
-    doc.font('Helvetica').fontSize(7).fill('#334155');
-    const simpRows = [
-      ['Actual Consumed (MT)', fmt(totFO)],
-      ['Guaranteed Consumption (MT)', fmt(totGuar)],
-      ['Excess (MT)', fmt(simpleExcess), simpleExcess > 0 ? '#DC2626' : '#16A34A'],
-      ['Excluded FO Adjustment (MT)', fmt(simpleExclFO)],
-      ['Reimbursable Excess (MT)', fmt(simpleReimb), simpleReimb > 0 ? '#DC2626' : '#16A34A'],
-      ['HFO Price ($/MT)', hfoPrice > 0 ? '$' + hfoPrice : 'Not set'],
-      ['Reimbursable Cost ($)', fmtC(simpleCost), simpleCost > 0 ? '#DC2626' : '#16A34A'],
-    ];
-    simpRows.forEach((r, i) => {
-      const ry = y + 18 + i * 13;
-      doc.fill('#334155').font('Helvetica').text(r[0], 35 + evalW + 10, ry, { width: evalW * 0.6 });
-      doc.fill(r[2] || '#334155').font('Helvetica-Bold').text(r[1], 35 + evalW + 10 + evalW * 0.55, ry, { width: evalW * 0.35, align: 'right' });
-    });
-
-    // ── CII Section ──────────────────────────────────────────────────────────
-    // Compute CII inline from local variables (export route has its own calc context)
-    const ciiDwt = vessel ? parseFloat(vessel.dwt) || 0 : 0;
-    const ciiCfHfo = vessel ? parseFloat(vessel.cf_hfo) || 3.114 : 3.114;
-    const ciiCfFoe = vessel ? parseFloat(vessel.cf_foe) || 2.750 : 2.750;
-    const ciiRef = 9.827;
-    const ciiYear = new Date().getFullYear();
-    const ciiZ = ({ 2023:5,2024:5,2025:7,2026:9,2027:11,2028:11,2029:11,2030:11 })[ciiYear] || 9;
-    const ciiRequired = ciiRef * (1 - ciiZ / 100);
-    const ciiBounds = { A: ciiRequired*0.82, B: ciiRequired*0.93, C: ciiRequired*1.14, D: ciiRequired*1.34 };
-    function getCiiRating(v) { return v<=ciiBounds.A?'A':v<=ciiBounds.B?'B':v<=ciiBounds.C?'C':v<=ciiBounds.D?'D':'E'; }
-
-    let cumCO2=0, cumDist2=0;
-    const ciiDaily = processed.map(r => {
-      const dCO2 = (r.hfo*ciiCfHfo) + (r.foe*ciiCfFoe);
-      cumCO2 += dCO2; cumDist2 += r.dist;
-      const runCII = cumDist2>0 ? (cumCO2*1000000)/(ciiDwt*cumDist2) : 0;
-      return { day:r.day_number, date:r.report_date, hfo:r.hfo, foe:r.foe, dist:r.dist,
-               daily_co2:dCO2, daily_cii: r.dist>0?(dCO2*1000000)/(ciiDwt*r.dist):0,
-               cum_co2:cumCO2, cum_dist:cumDist2, running_cii:runCII, running_rating:getCiiRating(runCII) };
-    });
-    const ciiAttained = cumDist2>0 ? (cumCO2*1000000)/(ciiDwt*cumDist2) : 0;
-    const ciiRating = getCiiRating(ciiAttained);
-
+    // ── CII PAGE ──────────────────────────────────────────────────────────────
     if (ciiDwt > 0) {
-      doc.addPage();
-      y = 30;
-      const ratingColors = { A: '#059669', B: '#0891B2', C: '#D97706', D: '#EA580C', E: '#DC2626' };
+      y = newPage('CII — Carbon Intensity Indicator  ·  IMO MEPC.352(78)');
+
+      const ratingColors = { A:'#059669', B:'#0891B2', C:'#D97706', D:'#EA580C', E:'#DC2626' };
       const rColor = ratingColors[ciiRating] || '#94A3B8';
 
-      // CII Header
-      doc.fill('#0F172A').rect(0, 0, pageW + 60, 50).fill();
-      doc.fill('#F8FAFC').fontSize(13).font('Helvetica-Bold').text('CII — Carbon Intensity Indicator', 30, 18);
-      doc.fill('#94A3B8').fontSize(7).font('Helvetica').text(`IMO MEPC.352(78) · ${voyage.vessel_name} · ${voyage.voyage_number}`, 30, 35);
-      y = 65;
-
-      // CII KPI row
-      const kpiW = (pageW - 30) / 4;
+      // KPI cards
+      const kpiW = (CONTENT) / 4;
       const kpis = [
-        { l: 'Attained CII', v: Number(ciiAttained).toFixed(2), c: rColor },
-        { l: 'CII Rating', v: ciiRating, c: rColor },
-        { l: 'Required CII', v: Number(ciiRequired).toFixed(2), c: '#94A3B8' },
-        { l: 'Total CO₂ (MT)', v: Number(cumCO2).toFixed(1), c: '#67E8F9' },
+        { l:'Attained CII',    v:Number(ciiAttained).toFixed(2), c:rColor    },
+        { l:'CII Rating',      v:ciiRating,                      c:rColor    },
+        { l:'Required CII',    v:Number(ciiRequired).toFixed(2), c:'#94A3B8' },
+        { l:`Total CO${'\u2082'} (MT)`, v:Number(cumCO2).toFixed(1), c:'#0891B2' },
       ];
       kpis.forEach((k, i) => {
-        const kx = 30 + i * kpiW;
-        doc.fill('#1E293B').rect(kx, y, kpiW - 6, 45).fill();
-        doc.fill('#64748B').fontSize(6).font('Helvetica').text(k.l.toUpperCase(), kx + 6, y + 8, { width: kpiW - 12 });
-        doc.fill(k.c).fontSize(14).font('Helvetica-Bold').text(k.v, kx + 6, y + 19, { width: kpiW - 12 });
+        const kx = MARGIN + i * kpiW;
+        doc.fill('#1E293B').rect(kx, y, kpiW - 4, 48).fill();
+        doc.fill('#64748B').fontSize(6).font('Helvetica')
+           .text(k.l.toUpperCase(), kx+6, y+8, { width: kpiW-14, lineBreak: false });
+        doc.fill(k.c).fontSize(18).font('Helvetica-Bold')
+           .text(k.v, kx+6, y+18, { width: kpiW-14, lineBreak: false });
       });
-      y += 55;
+      y += 56;
 
-      // Rating boundaries
-      doc.fill('#1E293B').rect(30, y, pageW - 30, 18).fill();
-      const bands = [
-        { l: 'A', c: '#059669' }, { l: 'B', c: '#0891B2' }, { l: 'C', c: '#D97706' },
-        { l: 'D', c: '#EA580C' }, { l: 'E', c: '#DC2626' }
-      ];
-      const bw = (pageW - 30) / 5;
-      bands.forEach((b, i) => {
-        doc.fill(b.c).rect(30 + i * bw, y, bw, 18).fill();
-        doc.fill('#FFFFFF').fontSize(8).font('Helvetica-Bold').text(b.l, 30 + i * bw + bw / 2 - 3, y + 5);
-      });
-      y += 26;
-
-      // Boundary labels
-      const boundVals = [
-        `≤ ${Number(ciiBounds.A).toFixed(2)}`,
-        `≤ ${Number(ciiBounds.B).toFixed(2)}`,
-        `≤ ${Number(ciiBounds.C).toFixed(2)}`,
-        `≤ ${Number(ciiBounds.D).toFixed(2)}`,
-        `> ${Number(ciiBounds.D).toFixed(2)}`
-      ];
-      boundVals.forEach((v, i) => {
-        doc.fill('#64748B').fontSize(6).font('Helvetica').text(v, 30 + i * bw, y, { width: bw, align: 'center' });
-      });
-      y += 18;
-
-      // CII parameters
-      const paramRows = [
-        ['Ship Type', 'LNG Carrier'],
-        ['DWT', Number(ciiDwt).toLocaleString() + ' MT'],
-        ['Reference CII', Number(ciiRef).toFixed(3)],
-        ['Reduction Factor', ciiZ + '%'],
-        ['Required CII', Number(ciiRequired).toFixed(3)],
-        ['CF (HFO)', String(ciiCfHfo)],
-        ['CF (LNG/FOE)', String(ciiCfFoe)],
-        ['Total Distance', Number(cumDist2).toLocaleString() + ' NM'],
-      ];
-      const halfW = (pageW - 30) / 2 - 6;
-      paramRows.forEach((row, i) => {
-        const col = i % 2;
-        const px = 30 + col * (halfW + 12);
-        if (col === 0 && i > 0) y += 13;
-        doc.fill('#1E293B').rect(px, y, halfW, 12).fill();
-        doc.fill('#64748B').fontSize(6.5).font('Helvetica').text(row[0], px + 5, y + 3, { width: halfW * 0.55 });
-        doc.fill('#E2E8F0').fontSize(6.5).font('Helvetica-Bold').text(row[1], px + halfW * 0.55, y + 3, { width: halfW * 0.42, align: 'right' });
+      // Rating band bar
+      const bw = CONTENT / 5;
+      ['A','B','C','D','E'].forEach((l, i) => {
+        const bc = { A:'#059669', B:'#0891B2', C:'#D97706', D:'#EA580C', E:'#DC2626' }[l];
+        doc.fill(bc).rect(MARGIN + i*bw, y, bw, 20).fill();
+        doc.fill('#FFFFFF').fontSize(9).font('Helvetica-Bold')
+           .text(l, MARGIN + i*bw, y+6, { width: bw, align:'center', lineBreak: false });
       });
       y += 22;
 
-      // Daily CII table
-      if (ciiDaily && ciiDaily.length > 0) {
-        doc.fill('#0F172A').rect(30, y, pageW - 30, 13).fill();
-        const ciiCols = [
-          { h: 'Day', w: 22, align: 'center' },
-          { h: 'Date', w: 42, align: 'left' },
-          { h: 'HFO', w: 30, align: 'right' },
-          { h: 'FOE', w: 30, align: 'right' },
-          { h: 'Dist NM', w: 35, align: 'right' },
-          { h: 'Daily CO2', w: 40, align: 'right' },
-          { h: 'Daily CII', w: 35, align: 'right' },
-          { h: 'Cum CO2', w: 40, align: 'right' },
-          { h: 'Run CII', w: 35, align: 'right' },
-          { h: 'Rating', w: 28, align: 'center' },
-        ];
-        let cx = 32;
-        ciiCols.forEach(col => {
-          doc.fill('#94A3B8').fontSize(6).font('Helvetica-Bold').text(col.h, cx, y + 4, { width: col.w, align: col.align });
-          cx += col.w;
-        });
-        y += 14;
+      // Boundary labels
+      const bLabels = [
+        `\u2264 ${ciiBounds.A.toFixed(2)}`,
+        `\u2264 ${ciiBounds.B.toFixed(2)}`,
+        `\u2264 ${ciiBounds.C.toFixed(2)}`,
+        `\u2264 ${ciiBounds.D.toFixed(2)}`,
+        `> ${ciiBounds.D.toFixed(2)}`,
+      ];
+      bLabels.forEach((l, i) => {
+        doc.fill('#64748B').fontSize(6).font('Helvetica')
+           .text(l, MARGIN + i*bw, y, { width: bw, align:'center', lineBreak: false });
+      });
+      y += 16;
 
-        ciiDaily.forEach((r, ri) => {
-          if (y > 740) { doc.addPage(); y = 30; }
-          const rc = ri % 2 === 0 ? '#0F172A' : '#141E2E';
-          doc.fill(rc).rect(30, y, pageW - 30, 11).fill();
-          cx = 32;
-          const ratingColor = ratingColors[r.running_rating] || '#94A3B8';
-          const rowData = [
-            { v: String(r.day), align: 'center', c: '#FBBF24' },
-            { v: r.date ? new Date(r.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '', align: 'left', c: '#94A3B8' },
-            { v: Number(r.hfo||0).toFixed(1), align: 'right', c: '#CBD5E1' },
-            { v: Number(r.foe||0).toFixed(2), align: 'right', c: '#CBD5E1' },
-            { v: Math.round(r.dist||0).toString(), align: 'right', c: '#CBD5E1' },
-            { v: Number(r.daily_co2||0).toFixed(1), align: 'right', c: '#94A3B8' },
-            { v: Number(r.daily_cii||0).toFixed(2), align: 'right', c: '#CBD5E1' },
-            { v: Number(r.cum_co2||0).toFixed(1), align: 'right', c: '#64748B' },
-            { v: Number(r.running_cii||0).toFixed(2), align: 'right', c: ratingColor },
-            { v: r.running_rating || '', align: 'center', c: ratingColor },
-          ];
-          rowData.forEach((cell, ci) => {
-            doc.fill(cell.c).fontSize(6).font(ci === 9 ? 'Helvetica-Bold' : 'Helvetica')
-               .text(cell.v, cx, y + 3, { width: ciiCols[ci].w, align: cell.align });
-            cx += ciiCols[ci].w;
-          });
-          y += 11;
-        });
+      // Parameter grid (2 columns, 4 rows)
+      const paramHalfW = (CONTENT - 8) / 2;
+      const params = [
+        ['Ship Type',       'LNG Carrier'],
+        ['DWT',             Number(ciiDwt).toLocaleString() + ' MT'],
+        ['Reference CII',   Number(ciiRef).toFixed(3)],
+        ['Reduction Factor', ciiZ + '%'],
+        ['Required CII',    Number(ciiRequired).toFixed(3)],
+        ['CF (HFO)',         String(ciiCfHfo)],
+        ['CF (LNG/FOE)',     String(ciiCfFoe)],
+        ['Total Distance',  Number(cumDist2).toLocaleString() + ' NM'],
+      ];
+      params.forEach((row, i) => {
+        const col = i % 2;
+        const px  = MARGIN + col * (paramHalfW + 8);
+        if (col === 0 && i > 0) y += 13;
+        doc.fill('#1E293B').rect(px, y, paramHalfW, 12).fill();
+        doc.fill('#64748B').fontSize(6.5).font('Helvetica')
+           .text(row[0], px+5, y+3, { width: paramHalfW*0.55, lineBreak: false });
+        doc.fill('#E2E8F0').fontSize(6.5).font('Helvetica-Bold')
+           .text(row[1], px + paramHalfW*0.55, y+3, { width: paramHalfW*0.42, align:'right', lineBreak: false });
+      });
+      y += 22;
 
-        // CII totals row
-        doc.fill('#1E293B').rect(30, y, pageW - 30, 13).fill();
-        const totData = [
-          { v: 'TOTAL', align: 'center', c: '#94A3B8', w: 22 },
-          { v: '', align: 'left', c: '#94A3B8', w: 42 },
-          { v: Number(totHFO||0).toFixed(1), align: 'right', c: '#FBBF24', w: 30 },
-          { v: Number(totFOE||0).toFixed(2), align: 'right', c: '#FBBF24', w: 30 },
-          { v: Math.round(cumDist2||0).toString(), align: 'right', c: '#FBBF24', w: 35 },
-          { v: Number(cumCO2||0).toFixed(1), align: 'right', c: '#FBBF24', w: 40 },
-          { v: '', align: 'right', c: '#94A3B8', w: 35 },
-          { v: '', align: 'right', c: '#94A3B8', w: 40 },
-          { v: Number(ciiAttained||0).toFixed(2), align: 'right', c: rColor, w: 35 },
-          { v: ciiRating, align: 'center', c: rColor, w: 28 },
-        ];
-        cx = 32;
-        totData.forEach(cell => {
-          doc.fill(cell.c).fontSize(6.5).font('Helvetica-Bold').text(cell.v, cx, y + 4, { width: cell.w, align: cell.align });
-          cx += cell.w;
-        });
-        y += 20;
-      }
+      // Attained CII indicator line on the band
+      const ciiRange  = ciiBounds.D * 1.5;
+      const ciiPct    = Math.min(ciiAttained / ciiRange, 0.98);
+      const indicatorX = MARGIN + ciiPct * CONTENT;
+      doc.fill('#FFFFFF').rect(MARGIN, y, CONTENT, 12).fill();
+      doc.fill(rColor).rect(MARGIN, y, CONTENT * ciiPct, 12).fill();
+      doc.fill('#FFFFFF').fontSize(6).font('Helvetica-Bold')
+         .text(`Attained: ${Number(ciiAttained).toFixed(2)}  (${ciiRating})`, MARGIN+4, y+3, { lineBreak: false });
+      doc.fill('#64748B').fontSize(6).font('Helvetica')
+         .text(`Required: ${Number(ciiRequired).toFixed(2)}`, MARGIN + CONTENT - 100, y+3, { lineBreak: false });
+      y += 18;
+
+      // Generated timestamp
+      doc.fill('#94A3B8').fontSize(6).font('Helvetica')
+         .text(`Generated: ${new Date().toISOString().slice(0,19)} UTC`, MARGIN, y+4, { lineBreak: false });
     }
-
-    // Footer
-    y += 14 + 7 * 13 + 15;
-    doc.fill('#94A3B8').fontSize(6).font('Helvetica').text(`Generated: ${new Date().toISOString().slice(0, 19)} · FORCAP Fleet Management System`, 30, Math.min(y, 555), { width: pageW, align: 'center' });
 
     doc.end();
   } catch (err) {
