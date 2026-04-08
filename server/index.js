@@ -16,6 +16,7 @@ app.use('/api/ref', require('./routes/refRoutes'));
 app.use('/api/lng-vessels', require('./routes/vesselRoutes'));
 app.use('/api/fuel-prices', require('./routes/priceRoutes'));
 app.use('/api/export', require('./routes/exportRoutes'));
+app.use('/api/import', require('./routes/importRoutes'));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'fuel-calculator' }));
 
 const dist = path.join(__dirname, '..', 'client', 'dist');
