@@ -27,7 +27,12 @@ export default function VoyageList() {
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-xl font-bold text-slate-100">Voyages</h1><p className="text-sm text-slate-500 mt-1">Excess fuel calculation records</p></div>
-        <button onClick={() => nav('/voyages/new')} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg,#B45309,#D97706)' }}>+ New Voyage</button>
+        <div className="flex gap-2">
+          {user?.role === 'admin' && (
+            <button onClick={() => nav('/voyages/import')} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-200 bg-slate-700/50 border border-white/10">&#8679; Import Excel</button>
+          )}
+          <button onClick={() => nav('/voyages/new')} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg,#B45309,#D97706)' }}>+ New Voyage</button>
+        </div>
       </div>
 
       <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search vessel, voyage, port..." className={`${inp} w-full max-w-sm`} />
