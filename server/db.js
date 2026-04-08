@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const pool = new Pool({
@@ -11,7 +12,23 @@ pool.on('connect', client => { client.query('SET search_path TO fuel, public'); 
 const initDB = async () => {
   const client = await pool.connect();
   try {
+    // Ensure fuel schema exists
+    await client.query('CREATE SCHEMA IF NOT EXISTS fuel');
+    await client.query('SET search_path TO fuel, public');
+
     await client.query(`
+      -- Users table (fuel calculator auth)
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(100) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(20) DEFAULT 'vessel',
+        display_name VARCHAR(200),
+        vessel_id INTEGER,
+        active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
       -- LNG vessel specifications
       CREATE TABLE IF NOT EXISTS lng_vessels (
         id SERIAL PRIMARY KEY,
@@ -123,6 +140,19 @@ const initDB = async () => {
       try { await client.query(`ALTER TABLE ${tbl} ADD COLUMN IF NOT EXISTS ${col} ${def}`); }
       catch (e) { /* column might exist */ }
     }
+
+    // Seed default admin if no users exist
+    const { rows } = await client.query('SELECT COUNT(*) FROM users');
+    if (parseInt(rows[0].count) === 0) {
+      const adminPass = process.env.ADMIN_PASSWORD || 'Forcap@2025!';
+      const hash = await bcrypt.hash(adminPass, 10);
+      await client.query(
+        'INSERT INTO users (username, password, role, display_name) VALUES ($1, $2, $3, $4)',
+        ['admin', hash, 'admin', 'System Administrator']
+      );
+      console.log('Default admin user seeded. Username: admin  Password:', adminPass);
+    }
+
   } finally { client.release(); }
 };
 
