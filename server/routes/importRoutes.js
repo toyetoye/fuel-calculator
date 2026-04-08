@@ -26,9 +26,11 @@ function parseSheet(ws) {
   }
 
   // Extract voyage header fields
-  const vessel      = meta['VESSEL']?.val || null;
-  const voyageNo    = rows[1]?.[1] || null;       // row 2 col B
-  const legType     = rows[1]?.[2] || 'BALLAST';  // row 2 col C
+  // Row 0 = header (VESSEL | VOYAGE NO. | VOYAGE LEG)
+  // Row 1 = data   (LNG RIVER-NIGER | NG/24/07B | BALLAST)
+  const vessel      = rows[1]?.[0] || null;  // col A, data row
+  const voyageNo    = rows[1]?.[1] || null;  // col B, data row
+  const legType     = rows[1]?.[2] || 'BALLAST';  // col C, data row
   const dischargePort = meta['DISCHARGE PORT']?.val || null;
 
   function toISO(v) {
