@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import VoyageList from './pages/VoyageList';
 import VoyageForm from './pages/VoyageForm';
 import VoyageDetail from './pages/VoyageDetail';
+import VoyageImport from './pages/VoyageImport';
 import VesselManage from './pages/VesselManage';
 import UserManage from './pages/UserManage';
 import FuelPrices from './pages/FuelPrices';
@@ -69,7 +70,8 @@ export default function App() {
             <Route path="/voyages" element={<ProtectedRoute><VoyageList /></ProtectedRoute>} />
             <Route path="/voyages/new" element={<ProtectedRoute><VoyageForm /></ProtectedRoute>} />
             <Route path="/voyages/:id/edit" element={<ProtectedRoute><VoyageForm /></ProtectedRoute>} />
-            <Route path="/voyages/:id" element={<ProtectedRoute><VoyageDetail /></ProtectedRoute>} />
+            <Route path="/voyages/import" element={<VoyageImport />} />
+        <Route path="/voyages/:id" element={<ProtectedRoute><VoyageDetail /></ProtectedRoute>} />
             <Route path="/vessels" element={<ProtectedRoute><VesselManage /></ProtectedRoute>} />
             <Route path="/fuel-prices" element={<ProtectedRoute><FuelPrices /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute><UserManage /></ProtectedRoute>} />
