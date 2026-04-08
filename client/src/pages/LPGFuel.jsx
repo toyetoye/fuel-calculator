@@ -48,7 +48,7 @@ export function LPGVoyageList() {
   useEffect(() => {
     setLoading(true); setErr('');
     const qs = vessel ? `?vessel=${encodeURIComponent(vessel)}` : '';
-    apiFetch(`/lpg/voyages${qs}`)
+    apiFetch(`/lpg/periods${qs}`)
       .then(v => { setMonths(Array.isArray(v) ? v : []); setLoading(false); })
       .catch(e => { setErr(e.message); setMonths([]); setLoading(false); });
   }, [vessel]);
@@ -96,7 +96,7 @@ export function LPGVoyageList() {
               <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">{yr}</div>
               <div className="grid grid-cols-3 gap-3">
                 {byYear[yr].map(m => (
-                  <div key={m.id} onClick={() => nav(`/lpg/voyages/${m.id}`)}
+                  <div key={m.id} onClick={() => nav(`/lpg/periods/${m.id}`)}
                     className="rounded-xl px-4 py-3 border border-white/5 hover:border-amber-800/40 cursor-pointer transition-all bg-slate-900/60 space-y-1">
                     <div className="text-sm font-bold text-slate-100">{fML(m.voyage_number)}</div>
                     <div className="text-xs text-slate-500">{m.vessel_name}</div>
@@ -131,7 +131,7 @@ export function LPGVoyageDetail() {
 
   const load = () => {
     setLoading(true); setErr('');
-    apiFetch(`/lpg/voyages/${id}`)
+    apiFetch(`/lpg/periods/${id}`)
       .then(d => { setData(d); setLoading(false); })
       .catch(e => { setErr(e.message); setLoading(false); });
   };
@@ -154,7 +154,7 @@ export function LPGVoyageDetail() {
   const delMonth = async () => {
     if (!confirm(`Delete ${fML(data.voyage_number)}?`)) return;
     if (prompt('Type DELETE') !== 'DELETE') return;
-    await apiFetch(`/lpg/voyages/${id}`, {method:'DELETE'}); nav('/lpg');
+    await apiFetch(`/lpg/periods/${id}`, {method:'DELETE'}); nav('/lpg');
   };
 
   if (loading) return <div className="flex items-center justify-center h-screen text-slate-500">Loading…</div>;
@@ -173,7 +173,7 @@ export function LPGVoyageDetail() {
         </div>
         <div className="flex gap-2">
           <button onClick={() => nav('/lpg')} className={`${BTN} bg-slate-700/40 border border-white/10 text-slate-300 text-xs`}>← Back</button>
-          <a href={`/api/lpg/voyages/${id}/pdf?token=${tok()}`} target="_blank" className={`${BTN} bg-slate-700/40 border border-white/10 text-slate-300 text-xs`}>📄 PDF</a>
+          <a href={`/api/lpg/periods/${id}/pdf?token=${tok()}`} target="_blank" className={`${BTN} bg-slate-700/40 border border-white/10 text-slate-300 text-xs`}>📄 PDF</a>
           {user?.role==='admin' && <button onClick={delMonth} className={`${BTN} bg-red-900/20 border border-red-800/30 text-red-400 text-xs`}>Delete</button>}
         </div>
       </div>
@@ -645,7 +645,7 @@ export function LPGImport() {
           {results.map((r,i)=>(
             <div key={i} className={`${CARD} flex items-center justify-between`}>
               <div><div className="text-sm font-semibold text-slate-200">{r.vessel_name} · {fML(r.voyage_number)}</div><div className="text-xs text-slate-500">{r.imported} records</div></div>
-              <button onClick={()=>nav(`/lpg/voyages/${r.voyage_id}`)} className={`${BTN} text-xs text-white`} style={AMBER}>Open →</button>
+              <button onClick={()=>nav(`/lpg/periods/${r.voyage_id}`)} className={`${BTN} text-xs text-white`} style={AMBER}>Open →</button>
             </div>
           ))}
           <div className="flex justify-end"><button onClick={()=>nav('/lpg')} className={`${BTN} bg-slate-700/50 border border-white/10 text-slate-200`}>← All Months</button></div>
@@ -668,7 +668,7 @@ export function LPGDashboard() {
   useEffect(()=>{
     setErr('');
     const qs=`?days=${days}${vessel?`&vessel=${encodeURIComponent(vessel)}`:''}`;
-    apiFetch(`/lpg/dashboard${qs}`).then(setData).catch(e=>setErr(e.message));
+    apiFetch(`/lpg/monthly${qs}`).then(setData).catch(e=>setErr(e.message));
   },[vessel,days]);
 
   if (!data && !err) return <div className="flex items-center justify-center h-screen text-slate-500">Loading…</div>;
