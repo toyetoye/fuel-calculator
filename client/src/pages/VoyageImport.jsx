@@ -27,7 +27,7 @@ export default function VoyageImport() {
       fd.append('file', file);
       const res = await fetch('/api/import/preview', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem('fuel_token')}` },
         body: fd,
       });
       const data = await res.json();
@@ -53,7 +53,7 @@ export default function VoyageImport() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('fuel_token')}`,
         },
         body: JSON.stringify({ voyages: toImport }),
       });
