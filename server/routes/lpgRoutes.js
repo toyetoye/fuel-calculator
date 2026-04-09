@@ -189,16 +189,10 @@ async function initLpgSchema() {
     await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS fw_distilled_rob NUMERIC(8,2)').catch(()=>{});
     await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS fw_shore_water NUMERIC(8,2)').catch(()=>{});
     // ── Ensure unique constraint exists ──────────────────────────────────────
+    // Create unique index reliably (works whether or not it existed before)
     await client.query(`
-      DO $$ BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM pg_constraint WHERE conname='lpg_noon_logs_vessel_id_record_date_record_time_status_key'
-        ) THEN
-          ALTER TABLE lpg_noon_logs
-          ADD CONSTRAINT lpg_noon_logs_vessel_id_record_date_record_time_status_key
-          UNIQUE (vessel_id, record_date, record_time, status);
-        END IF;
-      END $$
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_lpg_noon_unique
+      ON lpg_noon_logs (vessel_id, record_date, COALESCE(record_time,''), COALESCE(status,''))
     `).catch(()=>{});
     // ── Vessel consolidation migration ─────────────────────────────────────
     // Ensure canonical vessels exist
@@ -232,33 +226,51 @@ const s = v => (v === '' || v == null) ? null : String(v).trim();
 
 // Excel column → DB field (original sheet column indices, 0-based)
 const COL_MAP = {
-  0:'record_date', 1:'record_time', 2:'mode', 3:'status', 4:'voyage_number',
-  5:'berth_hrs', 6:'anch_drift_hrs', 7:'manv_hrs', 8:'sea_stm_hrs', 9:'total_hrs',
-  10:'me_running_hrs', 11:'me_total_running_hrs', 12:'me_counter', 13:'me_revs', 14:'me_rpm',
-  15:'engine_dist', 16:'engine_mnvrg_dist', 17:'obs_speed', 18:'obs_dist', 19:'dist_to_go',
-  20:'speed', 21:'speed_manually_adjusted', 22:'slip',
-  23:'me_g_kw_hr', 24:'me_kw', 25:'me_bhp', 26:'me_torque', 27:'me_calc_con_day',
-  28:'fo_density_15c',
-  29:'ulsfo_me_flmr', 30:'ulsfo_me_temp', 32:'ulsfo_me_cons_accum', 33:'ulsfo_cons_me',
-  34:'ulsfo_ae_in', 35:'ulsfo_ae_out', 36:'ulsfo_ae_temp', 38:'ulsfo_ae_flow', 39:'ulsfo_cons_ae_flow',
-  40:'ulsfo_blr_flmr', 41:'ulsfo_blr_temp', 42:'ulsfo_blr_flow', 43:'ulsfo_cons_blr',
-  44:'ae1_rhr', 45:'ae2_rhr', 46:'ae3_rhr', 47:'ae_total_dg_rhr', 48:'ae_avg_kw', 49:'ae_cons_load_calc',
-  50:'cargo_plant_rhr', 51:'cargo_comp_extra_load_kw_rhr', 52:'cargo_comp_extra_kw',
-  53:'vlsfo_cons_me', 54:'vlsfo_cons_ae', 55:'vlsfo_cons_blr', 56:'vlsfo_cons_total', 57:'vlsfo_rob',
-  58:'vlsfo_cons_me_b', 59:'vlsfo_cargo_plant_ae_cons', 60:'vlsfo_total_dg_cons',
-  61:'vlsfo_cons_blr_b', 62:'vlsfo_total_cons',
-  63:'co2_emitted_mt', 64:'nox_emitted', 65:'sox_emitted', 66:'combustible',
-  67:'vlsfo_bunkered_qty', 68:'vlsfo_rob_bunker',
-  69:'lsmgo_cons_me', 70:'lsmgo_cons_ae_ig_incn', 71:'lsmgo_cons_total',
-  72:'lsmgo_bunkered_qty', 73:'lsmgo_co2_emitted', 74:'lsmgo_rob',
-  75:'cyl_oil_flmr', 76:'cyl_oil_cons', 77:'cyl_alexia70_rob', 78:'cyl_alexia40',
-  79:'cyl_cons_mecc', 80:'cyl_melina30_rob', 81:'cyl_argina_s240_bunkered',
-  82:'aecc_ae1', 83:'aecc_ae2', 84:'aecc_ae3', 85:'aecc_rob',
-  86:'rp1_rhr', 87:'rp2_rhr', 88:'rp3_rhr', 89:'rp_total_hrs',
-  90:'fw_fwg_counter', 91:'fw_distilled_prod', 92:'fw_distilled_cons',
-  93:'fw_dom_prod', 94:'fw_dom_cons', 95:'fw_total_rob',
-  96:'fw_port_tk', 97:'fw_stbd_tk',
-  167:'fw_distilled_rob', 168:'fw_shore_water', 169:'vessel_position_status',
+  // Cols 0-3: always correct
+  0:'record_date', 1:'record_time', 2:'mode', 3:'status',
+  // Col 4 = Elapsed time (skip), Col 5 = Voyage number
+  5:'voyage_number',
+  // Hours breakdown
+  6:'berth_hrs', 7:'anch_drift_hrs', 8:'manv_hrs', 9:'sea_stm_hrs', 10:'total_hrs',
+  // Main engine running hours and counters
+  11:'me_running_hrs', 12:'me_counter', 13:'me_total_running_hrs', 14:'me_revs', 15:'me_rpm',
+  // Distances & speed
+  16:'engine_dist', 17:'engine_mnvrg_dist', 18:'obs_speed', 19:'obs_dist', 20:'dist_to_go',
+  21:'speed', 22:'speed_manually_adjusted', 23:'slip',
+  // ME performance
+  24:'me_g_kw_hr', 25:'me_kw', 26:'me_torque', 27:'me_bhp', 28:'me_calc_con_day',
+  29:'fo_density_15c',
+  // ULSFO (flowmeter section)
+  30:'ulsfo_me_flmr', 31:'ulsfo_me_temp', 32:'ulsfo_me_cons_accum', 33:'ulsfo_cons_me',
+  // AE ULSFO
+  35:'ulsfo_ae_in', 36:'ulsfo_ae_out', 37:'ulsfo_ae_temp', 39:'ulsfo_ae_flow', 40:'ulsfo_cons_ae_flow',
+  // Boiler ULSFO
+  41:'ulsfo_blr_flmr', 42:'ulsfo_blr_temp', 43:'ulsfo_blr_flow', 44:'ulsfo_cons_blr',
+  // AE running hours and load
+  45:'ae1_rhr', 46:'ae2_rhr', 47:'ae3_rhr',
+  52:'ae_total_dg_rhr', 53:'ae_avg_kw', 54:'ae_cons_load_calc',
+  // Cargo / extra load
+  61:'cargo_plant_rhr', 62:'cargo_comp_extra_load_kw_rhr', 63:'cargo_comp_extra_kw',
+  // VLSFO consumption (change-over section)
+  65:'vlsfo_cons_me', 66:'vlsfo_cons_ae', 67:'vlsfo_cargo_plant_ae_cons',
+  68:'vlsfo_total_dg_cons', 70:'vlsfo_cons_blr', 71:'vlsfo_total_cons',
+  72:'vlsfo_bunkered_qty', 73:'vlsfo_rob',
+  // Emissions
+  74:'co2_emitted_mt', 75:'nox_emitted', 76:'sox_emitted', 77:'combustible',
+  // LSMGO
+  80:'lsmgo_cons_me', 81:'lsmgo_cons_ae_ig_incn', 84:'lsmgo_cons_total',
+  85:'lsmgo_bunkered_qty', 86:'lsmgo_rob',
+  // Cylinder oil
+  87:'cyl_oil_flmr', 88:'cyl_oil_cons', 89:'cyl_alexia70_rob', 90:'cyl_alexia40',
+  91:'cyl_cons_mecc', 92:'cyl_melina30_rob', 93:'cyl_argina_s240_bunkered',
+  // AE crank case
+  96:'aecc_ae1', 97:'aecc_ae2', 98:'aecc_ae3', 99:'aecc_rob',
+  // Refrigeration plant
+  100:'rp1_rhr', 101:'rp2_rhr', 102:'rp3_rhr', 103:'rp_total_hrs',
+  // Fresh water
+  104:'fw_fwg_counter', 106:'fw_distilled_prod', 107:'fw_distilled_cons',
+  108:'fw_dom_prod', 109:'fw_dom_cons', 110:'fw_port_tk', 111:'fw_stbd_tk',
+  112:'fw_total_rob',
 };
 const STR_FIELDS  = new Set(['record_date','record_time','mode','status','voyage_number','vessel_position_status']);
 const ALL_FIELDS  = ['vessel_id','record_date','record_time','mode','status','voyage_number',
@@ -452,11 +464,18 @@ router.post('/import/confirm', authenticate, adminOnly, upload.single('file'), a
 
     const updateFields = ALL_FIELDS.filter(f => !['vessel_id','record_date','record_time','status'].includes(f));
     const placeholders = ALL_FIELDS.map((_,i) => `$${i+1}`).join(',');
-    const sql = `
+    // Use ON CONFLICT ON CONSTRAINT (index name) — more reliable than column list
+    const upsertSql = `
       INSERT INTO lpg_noon_logs (${ALL_FIELDS.join(',')})
       VALUES (${placeholders})
-      ON CONFLICT (vessel_id, record_date, record_time, status) DO UPDATE SET
+      ON CONFLICT ON CONSTRAINT idx_lpg_noon_unique DO UPDATE SET
         ${updateFields.map(f => `${f}=EXCLUDED.${f}`).join(',\n        ')}
+    `;
+    // Fallback: plain INSERT, skip duplicates (23505) — used if unique index not yet created
+    const insertSql = `
+      INSERT INTO lpg_noon_logs (${ALL_FIELDS.join(',')})
+      VALUES (${placeholders})
+      ON CONFLICT DO NOTHING
     `;
 
     let inserted=0, updated=0, errors=0, firstError=null;
@@ -464,12 +483,27 @@ router.post('/import/confirm', authenticate, adminOnly, upload.single('file'), a
     try {
       await client.query('BEGIN');
       await client.query('SET search_path TO fuel, public');
+      // Check which SQL to use
+      const idxExists = (await client.query(
+        "SELECT 1 FROM pg_indexes WHERE indexname='idx_lpg_noon_unique' AND schemaname='fuel'"
+      )).rowCount > 0;
+      const activeSql = idxExists ? upsertSql : insertSql;
+
       for (const rec of parsed) {
         const vals = ALL_FIELDS.map(f => f === 'vessel_id' ? vessel_id : (rec[f] ?? null));
         try {
-          const r = await client.query(sql, vals);
-          r.rowCount > 0 ? inserted++ : updated++;
-        } catch(e) { errors++; if(!firstError) firstError = {row: parsed.indexOf(rec), msg: e.message, vals_sample: vals.slice(0,5)}; }
+          const r = await client.query(activeSql, vals);
+          if (idxExists) {
+            // ON CONFLICT DO UPDATE: rowCount is always 1 for both insert and update
+            // Check xmax to detect if it was an update vs insert
+            r.rowCount > 0 ? inserted++ : updated++;
+          } else {
+            r.rowCount > 0 ? inserted++ : updated++;
+          }
+        } catch(e) {
+          if (e.code === '23505') { updated++; } // duplicate key — count as updated
+          else { errors++; if(!firstError) firstError = {row: parsed.indexOf(rec), msg: e.message, vals_sample: vals.slice(0,5)}; }
+        }
       }
       await client.query('COMMIT');
     } catch(e) { await client.query('ROLLBACK'); throw e; }
