@@ -18,7 +18,7 @@ export default function VoyageList() {
     v.discharge_port?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const statusCls = { draft: 'bg-amber-900/30 text-amber-300 border-amber-700/40', finalised: 'bg-emerald-900/30 text-emerald-300 border-emerald-700/40' };
+  const statusCls = { draft: 'bg-amber-600 text-white', finalised: 'bg-emerald-600 text-white' };
   const inp = "px-3 py-2 rounded-lg bg-slate-800/50 border border-white/10 text-slate-200 text-sm focus:outline-none focus:border-amber-600";
 
   if (loading) return <div className="flex items-center justify-center h-screen text-slate-500 text-sm">Loading...</div>;
@@ -29,7 +29,7 @@ export default function VoyageList() {
         <div><h1 className="text-xl font-bold text-slate-100">Voyages</h1><p className="text-sm text-slate-500 mt-1">Excess fuel calculation records</p></div>
         <div className="flex gap-2">
           {user?.role === 'admin' && (
-            <button onClick={() => nav('/voyages/import')} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-200 bg-slate-700/50 border border-white/10">&#8679; Import Excel</button>
+            <button onClick={() => nav('/voyages/import')} className="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-600 text-white hover:bg-slate-500 transition-colors">&#8679; Import Excel</button>
           )}
           <button onClick={() => nav('/voyages/new')} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg,#B45309,#D97706)' }}>+ New Voyage</button>
         </div>
@@ -54,8 +54,8 @@ export default function VoyageList() {
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-semibold text-slate-100">{v.vessel_name}</span>
                   <span className="text-xs text-slate-500">Voy: {v.voyage_number}</span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium border ${v.leg_type === 'LADEN' ? 'bg-blue-900/30 text-blue-300 border-blue-700/40' : 'bg-slate-700/30 text-slate-300 border-slate-600/40'}`}>{v.leg_type}</span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium border ${statusCls[v.status] || statusCls.draft}`}>{v.status}</span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-bold tracking-wide ${v.leg_type === 'LADEN' ? 'bg-blue-600 text-white' : 'bg-slate-500 text-white'}`}>{v.leg_type}</span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-bold tracking-wide ${statusCls[v.status] || statusCls.draft}`}>{v.status}</span>
                 </div>
                 <div className="text-xs text-slate-500 mt-1">
                   {v.discharge_port || v.loading_port || 'No port specified'} · {v.faop_time ? new Date(v.faop_time).toLocaleDateString() : 'No date'} → {v.eosp_time ? new Date(v.eosp_time).toLocaleDateString() : ''}
