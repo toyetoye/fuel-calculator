@@ -56,6 +56,23 @@ const api = {
   saveReport: (voyId, r) => apiFetch(`/reports/${voyId}`, { method: 'POST', body: JSON.stringify(r) }),
   bulkSaveReports: (voyId, reports) => apiFetch(`/reports/${voyId}/bulk`, { method: 'POST', body: JSON.stringify({ reports }) }),
 
+
+  // Generic helpers used by LPG module
+  get: path => apiFetch(path.startsWith('/api') ? path.slice(4) : path),
+  upload: async (path, formData) => {
+    const p = path.startsWith('/api') ? path.slice(4) : path;
+    const token = getToken();
+    const res = await fetch('/api' + p, {
+      method: 'POST',
+      headers: token ? { Authorization: 'Bearer ' + token } : {},
+      body: formData,
+    });
+    if (res.status === 401) { localStorage.removeItem('fuel_token'); localStorage.removeItem('fuel_user'); window.location.href = '/login'; throw new Error('Unauthorized'); }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  },
+
   // Export
   getPdfUrl: voyId => `${BASE}/export/${voyId}/pdf?token=${getToken()}`,
 };
