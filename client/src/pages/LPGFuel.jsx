@@ -87,7 +87,8 @@ function CIIBadge({ rating, attained, required }) {
       <div className="text-6xl font-bold" style={{color:col}}>{rating}</div>
       <div className="text-xs text-slate-400 mt-2">Attained: <span style={{color:col}}>{fmt(attained,3)}</span></div>
       <div className="text-xs text-slate-500">Required: {fmt(required,3)}</div>
-      <div className="flex gap-1 mt-3">
+      <div className="text-[10px] text-slate-600 mt-2 text-center px-2">IMO MEPC.339(76) — small coastal LPG carriers typically attain E under this framework</div>
+      <div className="flex gap-1 mt-2">
         {['A','B','C','D','E'].map(l=>(
           <div key={l} className="px-2 py-0.5 rounded text-xs font-bold" style={{background:colors[l],color:'#fff',opacity:l===rating?1:0.3}}>{l}</div>
         ))}
@@ -163,7 +164,9 @@ export function LPGDashboard() {
         <div className="md:col-span-2 rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-slate-200">Alerts & Anomalies</h3>
-            {anomalies.length > 0 && <span className="px-2 py-0.5 bg-red-900/40 text-red-300 text-xs rounded">{anomalies.length} items</span>}
+            <span className={`px-2 py-0.5 text-xs rounded ${anomalies.length > 0 ? 'bg-red-900/40 text-red-300' : 'bg-green-900/40 text-green-300'}`}>
+              {anomalies.length > 0 ? `${anomalies.length} items` : '✓ Clear'}
+            </span>
           </div>
           {anomalies.length === 0 ? (
             <div className="text-sm text-green-400 flex items-center gap-2">
@@ -176,8 +179,9 @@ export function LPGDashboard() {
                   <span className="text-red-400 mt-0.5">⚠</span>
                   <div>
                     <span className="text-slate-300 font-mono">{fmtD(a.record_date)}</span>
-                    {a.slip > 8 && <span className="ml-2 text-amber-300">Slip {fmt(a.slip)}% — possible hull fouling</span>}
-                    {a.vlsfo_total_cons < 0 && <span className="ml-2 text-red-300">Negative VLSFO consumption ({fmt(a.vlsfo_total_cons)} MT) — flow meter anomaly</span>}
+                    {a.anomaly_type === 'high_slip' && <span className="ml-2 text-amber-300">Slip {fmt(a.slip)}% (sea passage) — possible hull fouling</span>}
+                    {a.anomaly_type === 'neg_fuel' && <span className="ml-2 text-red-300">Negative VLSFO total ({fmt(a.vlsfo_total_cons)} MT) — check entry</span>}
+                    {a.anomaly_type === 'flowmeter_anomaly' && <span className="ml-2 text-orange-300">Flow meter anomaly — ulsfo_cons_me = {fmt(a.ulsfo_cons_me)} MT</span>}
                   </div>
                 </div>
               ))}
