@@ -26,21 +26,20 @@ function Sidebar() {
   const loc = useLocation();
   const r = user?.role;
 
-  const isAdmin   = r === 'admin';
+  const isAdmin = r === 'admin';
   const isManager = r === 'manager';
-  const isSup     = r === 'superintendent';
-  const hasLpg    = isAdmin || isManager || isSup ||
+  const isSup = r === 'superintendent';
+  const hasLpg = isAdmin || isManager || isSup ||
     (user?.vessel_names || []).some(v => v.toLowerCase().includes('alfred temile'));
-  const hasLng    = isAdmin || isManager || isSup ||
+  const hasLng = isAdmin || isManager || isSup ||
     (user?.vessel_names || []).some(v => !v.toLowerCase().includes('alfred temile'));
-  // Pure LPG vessel user: only sees LPG nav
-  const lpgOnly   = hasLpg && !hasLng && !isAdmin && !isManager && !isSup;
+  const lpgOnly = hasLpg && !hasLng && !isAdmin && !isManager && !isSup;
 
-  const active = path => loc.pathname === path || loc.pathname.startsWith(path + '/');
+  const active = (path) => loc.pathname === path || loc.pathname.startsWith(path + '/');
 
   const btn = (path, label, icon) => (
     <button key={path} onClick={() => nav(path)}
-      className={}>
+      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${active(path) ? 'bg-amber-900/30 text-amber-300' : 'text-slate-400 hover:bg-white/5'}`}>
       <span className="text-base">{icon}</span>{label}
     </button>
   );
@@ -50,23 +49,26 @@ function Sidebar() {
       <div className="p-5 border-b border-white/5">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg,#B45309,#D97706)' }}>FC</div>
-          <div><div className="text-sm font-bold text-slate-100">FORCAP</div><div className="text-[10px] text-slate-500 uppercase tracking-widest">{user?.role}</div></div>
+          <div>
+            <div className="text-sm font-bold text-slate-100">FORCAP</div>
+            <div className="text-[10px] text-slate-500 uppercase tracking-widest">{user?.role}</div>
+          </div>
         </div>
       </div>
       <nav className="flex-1 p-3 space-y-1">
         {lpgOnly ? (
           <>
-            {btn('/lpg',          'Dashboard',       '◈')}
-            {btn('/lpg/noon',     'Daily Noon',      '✏️')}
-            {btn('/lpg/history',  'History',         '📋')}
+            {btn('/lpg',         'Dashboard',  '◈')}
+            {btn('/lpg/noon',    'Daily Noon', '✏️')}
+            {btn('/lpg/history', 'History',    '📋')}
           </>
         ) : (
           <>
-            {(isAdmin||isManager||isSup||hasLng) && btn('/voyages', 'Voyages', '⊞')}
-            {(isAdmin||isSup) && btn('/voyages/new', 'New Voyage', '⊕')}
+            {(isAdmin || isManager || isSup || hasLng) && btn('/voyages', 'Voyages', '⊞')}
+            {(isAdmin || isSup) && btn('/voyages/new', 'New Voyage', '⊕')}
             {hasLpg && (
               <>
-                <div className="text-[10px] text-slate-600 uppercase tracking-widest px-3 pt-2 pb-1">LPG</div>
+                <div className="text-[10px] text-slate-600 uppercase tracking-widest px-3 pt-3 pb-1">LPG</div>
                 {btn('/lpg',         'Dashboard',  '◈')}
                 {btn('/lpg/noon',    'Daily Noon', '✏️')}
                 {btn('/lpg/history', 'History',    '📋')}
@@ -96,21 +98,21 @@ export default function App() {
         {user && loc.pathname !== '/login' && <Sidebar />}
         <div className="flex-1 overflow-auto">
           <Routes>
-            <Route path="/login"              element={<Login />} />
-            <Route path="/voyages"            element={<ProtectedRoute><VoyageList /></ProtectedRoute>} />
-            <Route path="/voyages/new"        element={<ProtectedRoute><VoyageForm /></ProtectedRoute>} />
-            <Route path="/voyages/:id/edit"   element={<ProtectedRoute><VoyageForm /></ProtectedRoute>} />
-            <Route path="/voyages/import"     element={<VoyageImport />} />
-            <Route path="/voyages/:id"        element={<ProtectedRoute><VoyageDetail /></ProtectedRoute>} />
-            <Route path="/lpg"               element={<ProtectedRoute><LPGDashboard /></ProtectedRoute>} />
-            <Route path="/lpg/noon"          element={<ProtectedRoute><LPGNoonForm /></ProtectedRoute>} />
-            <Route path="/lpg/history"       element={<ProtectedRoute><LPGHistory /></ProtectedRoute>} />
+            <Route path="/login"             element={<Login />} />
+            <Route path="/voyages"           element={<ProtectedRoute><VoyageList /></ProtectedRoute>} />
+            <Route path="/voyages/new"       element={<ProtectedRoute><VoyageForm /></ProtectedRoute>} />
+            <Route path="/voyages/:id/edit"  element={<ProtectedRoute><VoyageForm /></ProtectedRoute>} />
+            <Route path="/voyages/import"    element={<VoyageImport />} />
+            <Route path="/voyages/:id"       element={<ProtectedRoute><VoyageDetail /></ProtectedRoute>} />
+            <Route path="/lpg"              element={<ProtectedRoute><LPGDashboard /></ProtectedRoute>} />
+            <Route path="/lpg/noon"         element={<ProtectedRoute><LPGNoonForm /></ProtectedRoute>} />
+            <Route path="/lpg/history"      element={<ProtectedRoute><LPGHistory /></ProtectedRoute>} />
             <Route path="/lpg/history/:month_key" element={<ProtectedRoute><LPGMonthDetail /></ProtectedRoute>} />
-            <Route path="/lpg/import"        element={<ProtectedRoute><LPGImport /></ProtectedRoute>} />
-            <Route path="/vessels"           element={<ProtectedRoute><VesselManage /></ProtectedRoute>} />
-            <Route path="/fuel-prices"       element={<ProtectedRoute><FuelPrices /></ProtectedRoute>} />
-            <Route path="/users"             element={<ProtectedRoute><UserManage /></ProtectedRoute>} />
-            <Route path="*"                  element={<Navigate to={user ? '/lpg' : '/login'} />} />
+            <Route path="/lpg/import"       element={<ProtectedRoute><LPGImport /></ProtectedRoute>} />
+            <Route path="/vessels"          element={<ProtectedRoute><VesselManage /></ProtectedRoute>} />
+            <Route path="/fuel-prices"      element={<ProtectedRoute><FuelPrices /></ProtectedRoute>} />
+            <Route path="/users"            element={<ProtectedRoute><UserManage /></ProtectedRoute>} />
+            <Route path="*"                 element={<Navigate to={user ? '/lpg' : '/login'} />} />
           </Routes>
         </div>
       </div>
