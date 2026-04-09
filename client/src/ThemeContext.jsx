@@ -87,6 +87,14 @@ export function ThemeProvider({ children }) {
       [data-theme="light"] nav .text-slate-600 { color: #334155 !important; }
     `;
 
+    const LIGHT_TABLE_VARS = `
+      /* Light theme: tables use white/near-white backgrounds */
+      [data-theme="light"] { 
+        --card-bg: rgba(255,255,255,0.95) !important;
+        --table-head-bg: rgba(241,245,249,0.98) !important;
+        --table-row-bg: rgba(248,250,252,0.6) !important;
+      }
+    `;
     const LIGHT_OVERRIDES = `
       /* ── LIGHT: all slate text classes → near-black for high contrast ── */
       [data-theme="light"] .text-slate-100 { color: #0f172a !important; }
@@ -115,7 +123,7 @@ export function ThemeProvider({ children }) {
       [data-theme="light"] nav .text-slate-600 { color: #94a3b8 !important; }
     `;
 
-    el.textContent = DARK_OVERRIDES + LIGHT_OVERRIDES;
+    el.textContent = DARK_OVERRIDES + LIGHT_TABLE_VARS + LIGHT_OVERRIDES;
   }, [themeKey]);
 
   return (
