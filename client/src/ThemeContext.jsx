@@ -11,6 +11,8 @@ export const themes = {
     cardBorder:'rgba(255,255,255,0.05)',
     table:     'rgba(8,15,30,0.8)',
     tableRow:  'rgba(15,23,42,0.4)',
+    rowEven:   'rgba(255,255,255,0.00)',
+    rowOdd:    'rgba(255,255,255,0.04)',
     text:        '#f1f5f9',   // slate-100 — high contrast on dark bg
     textMuted:   '#94a3b8',   // slate-400 — readable secondary text
     textSubtle:  '#64748b',   // slate-500 — chart labels
@@ -26,6 +28,8 @@ export const themes = {
     cardBorder:'rgba(255,255,255,0.08)',
     table:     'rgba(15,25,40,0.9)',
     tableRow:  'rgba(22,34,52,0.6)',
+    rowEven:   'rgba(255,255,255,0.00)',
+    rowOdd:    'rgba(255,255,255,0.035)',
     text:        '#f8fafc',   // slate-50 — near-white, high contrast
     textMuted:   '#94a3b8',   // slate-400 — readable secondary text
     textSubtle:  '#64748b',   // slate-500
@@ -41,6 +45,8 @@ export const themes = {
     cardBorder:'rgba(0,0,0,0.08)',
     table:     'rgba(255,255,255,0.95)',
     tableRow:  'rgba(241,245,249,0.8)',
+    rowEven:   'rgba(255,255,255,1.0)',
+    rowOdd:    'rgba(241,245,249,0.95)',
     text:      '#1e293b',
     textMuted: '#64748b',
     input:     '#f8fafc',
@@ -69,6 +75,8 @@ export function ThemeProvider({ children }) {
     document.documentElement.style.setProperty('--text-subtle',     t.textSubtle || t.textMuted);
     document.documentElement.style.setProperty('--chart-label',     t.chartLabel || '#94a3b8');
     document.documentElement.style.setProperty('--input-bg',        t.input);
+    document.documentElement.style.setProperty('--row-even',        t.rowEven || 'rgba(255,255,255,0)');
+    document.documentElement.style.setProperty('--row-odd',         t.rowOdd  || 'rgba(255,255,255,0.04)');
     document.documentElement.setAttribute('data-theme', themeKey);
     document.body.style.color = t.text;
     document.body.style.background = t.bg;
@@ -113,12 +121,22 @@ export function ThemeProvider({ children }) {
       /* Light theme: card/table backgrounds → white */
       [data-theme="light"] [class*="border-white"] { border-color: rgba(0,0,0,0.12) !important; }
       [data-theme="light"] .hover\:bg-white\/5:hover { background: rgba(0,0,0,0.05) !important; }
+      /* Sidebar: dark bg in ALL themes — override ALL slate text to bright */
+      nav .text-slate-100 { color: #f8fafc !important; }
+      nav .text-slate-300 { color: #e2e8f0 !important; }
+      nav .text-slate-400 { color: #cbd5e1 !important; }
+      nav .text-slate-500 { color: #94a3b8 !important; }
+      nav .text-slate-600 { color: #94a3b8 !important; }
+      nav .text-slate-200 { color: #f1f5f9 !important; }
       /* Sidebar on light theme: ALWAYS dark bg with white text */
       [data-theme="light"] nav,
       [data-theme="light"] nav button { color: #e2e8f0 !important; }
       [data-theme="light"] nav .text-amber-300 { color: #fbbf24 !important; }
-      /* Override monochrome/tracking labels in sidebar */
+      /* Override section labels & role badge in sidebar */
       [data-theme="light"] nav .text-slate-600 { color: #94a3b8 !important; }
+      [data-theme="light"] nav .text-slate-500 { color: #94a3b8 !important; }
+      [data-theme="light"] nav .text-slate-400 { color: #cbd5e1 !important; }
+      [data-theme="light"] nav .text-slate-300 { color: #e2e8f0 !important; }
     `;
 
     el.textContent = DARK_OVERRIDES + LIGHT_TABLE_VARS + LIGHT_OVERRIDES;
