@@ -77,7 +77,7 @@ export default function App() {
             <Route path="/voyages/new" element={<ProtectedRoute><VoyageForm /></ProtectedRoute>} />
             <Route path="/voyages/:id/edit" element={<ProtectedRoute><VoyageForm /></ProtectedRoute>} />
             <Route path="/lpg" element={<ProtectedRoute><LPGVoyageList /></ProtectedRoute>} />
-        <Route path="/lpg/periods/:id" element={<ProtectedRoute><LPGVoyageDetail /></ProtectedRoute>} />
+        <Route path="/lpg/voyages/:voyage_number" element={<ProtectedRoute><LPGVoyageDetail /></ProtectedRoute>} />
         <Route path="/lpg/import" element={<ProtectedRoute><LPGImport /></ProtectedRoute>} />
         <Route path="/lpg/dashboard" element={<ProtectedRoute><LPGDashboard /></ProtectedRoute>} />
         <Route path="/voyages/import" element={<VoyageImport />} />
