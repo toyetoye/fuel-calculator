@@ -431,8 +431,8 @@ router.get('/analytics', authenticate, lpgAccess, async (req, res) => {
       SELECT
         TO_CHAR(record_date,'YYYY-MM')  AS month_key,
         TO_CHAR(record_date,'Mon YY')   AS month_label,
-        ROUND(AVG(NULLIF(slip,0))::numeric,2)              AS avg_slip,
-        ROUND(MAX(NULLIF(slip,0))::numeric,2)              AS max_slip,
+        ROUND(AVG(CASE WHEN sea_stm_hrs > 0 AND obs_dist > 0 AND slip BETWEEN 0.1 AND 50 THEN slip END)::numeric,2) AS avg_slip,
+        ROUND(MAX(CASE WHEN sea_stm_hrs > 0 AND obs_dist > 0 AND slip BETWEEN 0.1 AND 50 THEN slip END)::numeric,2) AS max_slip,
         ROUND(SUM(COALESCE(me_running_hrs,0))::numeric,1)  AS me_running_hrs,
         ROUND(SUM(COALESCE(cyl_oil_cons,0))::numeric,1)    AS cyl_oil_cons,
         ROUND(SUM(COALESCE(vlsfo_total_cons,0))::numeric,2) AS vlsfo_cons,
@@ -468,8 +468,17 @@ router.get('/analytics', authenticate, lpgAccess, async (req, res) => {
     const anWhere = vessel_id ? 'WHERE vessel_id=$1 AND' : 'WHERE';
     const anParams = vessel_id ? [vessel_id] : [];
     const anomalies = (await pool.query(
-      `SELECT record_date, slip, vlsfo_total_cons, voyage_number, status
-       FROM lpg_noon_logs ${anWhere} (slip > 8 OR vlsfo_total_cons < 0 OR ulsfo_cons_me < -100)
+      `SELECT record_date, slip, vlsfo_total_cons, voyage_number, status,
+              sea_stm_hrs, obs_dist,
+              CASE WHEN sea_stm_hrs > 0 AND obs_dist > 0 AND slip BETWEEN 8 AND 50 THEN 'high_slip'
+                   WHEN vlsfo_total_cons < -0.5 THEN 'neg_fuel'
+                   WHEN ulsfo_cons_me < -500 THEN 'flowmeter_anomaly'
+              END AS anomaly_type
+       FROM lpg_noon_logs ${anWhere} (
+         (sea_stm_hrs > 0 AND obs_dist > 0 AND slip BETWEEN 8 AND 50)
+         OR vlsfo_total_cons < -0.5
+         OR ulsfo_cons_me < -500
+       )
        ORDER BY record_date DESC LIMIT 20`,
       anParams
     )).rows;
