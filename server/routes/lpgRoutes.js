@@ -94,6 +94,112 @@ async function initLpgSchema() {
     await client.query('ALTER TABLE lpg_noon_logs ALTER COLUMN ulsfo_cons_me TYPE NUMERIC(14,4) USING ulsfo_cons_me::NUMERIC(14,4)').catch(()=>{});
     await client.query('ALTER TABLE lpg_noon_logs ALTER COLUMN voyage_number TYPE TEXT');
     await client.query('ALTER TABLE lpg_noon_logs ALTER COLUMN mode TYPE TEXT');
+    // ── Add any missing columns (idempotent — safe on every deploy) ──────────
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS berth_hrs NUMERIC(6,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS anch_drift_hrs NUMERIC(6,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS manv_hrs NUMERIC(6,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS sea_stm_hrs NUMERIC(6,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS total_hrs NUMERIC(6,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS me_running_hrs NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS me_total_running_hrs NUMERIC(10,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS me_counter NUMERIC(12,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS me_revs NUMERIC(10,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS me_rpm NUMERIC(6,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS engine_dist NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS engine_mnvrg_dist NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS obs_speed NUMERIC(6,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS obs_dist NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS dist_to_go NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS speed NUMERIC(6,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS speed_manually_adjusted NUMERIC(6,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS slip NUMERIC(6,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS me_g_kw_hr NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS me_kw NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS me_bhp NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS me_torque NUMERIC(10,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS me_calc_con_day NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS fo_density_15c NUMERIC(6,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ulsfo_me_flmr NUMERIC(12,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ulsfo_me_temp NUMERIC(6,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ulsfo_me_cons_accum NUMERIC(14,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ulsfo_cons_me NUMERIC(14,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ulsfo_ae_in NUMERIC(12,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ulsfo_ae_out NUMERIC(12,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ulsfo_ae_temp NUMERIC(6,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ulsfo_ae_flow NUMERIC(10,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ulsfo_cons_ae_flow NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ulsfo_blr_flmr NUMERIC(12,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ulsfo_blr_temp NUMERIC(6,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ulsfo_blr_flow NUMERIC(10,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ulsfo_cons_blr NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ae1_rhr NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ae2_rhr NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ae3_rhr NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ae_total_dg_rhr NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ae_avg_kw NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS ae_cons_load_calc NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS cargo_plant_rhr NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS cargo_comp_extra_load_kw_rhr NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS cargo_comp_extra_kw NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS vlsfo_cons_me NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS vlsfo_cons_ae NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS vlsfo_cons_blr NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS vlsfo_cons_total NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS vlsfo_rob NUMERIC(10,3)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS vlsfo_cons_me_b NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS vlsfo_cargo_plant_ae_cons NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS vlsfo_total_dg_cons NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS vlsfo_cons_blr_b NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS vlsfo_total_cons NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS co2_emitted_mt NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS nox_emitted NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS sox_emitted NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS combustible NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS vlsfo_bunkered_qty NUMERIC(8,3)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS vlsfo_rob_bunker NUMERIC(10,3)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS lsmgo_cons_me NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS lsmgo_cons_ae_ig_incn NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS lsmgo_cons_total NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS lsmgo_bunkered_qty NUMERIC(8,3)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS lsmgo_co2_emitted NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS lsmgo_rob NUMERIC(10,3)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS cyl_oil_flmr NUMERIC(10,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS cyl_oil_cons NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS cyl_alexia70_rob NUMERIC(8,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS cyl_alexia40 NUMERIC(8,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS cyl_cons_mecc NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS cyl_melina30_rob NUMERIC(8,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS cyl_argina_s240_bunkered NUMERIC(8,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS aecc_ae1 NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS aecc_ae2 NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS aecc_ae3 NUMERIC(8,4)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS aecc_rob NUMERIC(8,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS rp1_rhr NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS rp2_rhr NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS rp3_rhr NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS rp_total_hrs NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS fw_fwg_counter NUMERIC(12,1)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS fw_distilled_prod NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS fw_distilled_cons NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS fw_dom_prod NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS fw_dom_cons NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS fw_total_rob NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS fw_port_tk NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS fw_stbd_tk NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS fw_distilled_rob NUMERIC(8,2)').catch(()=>{});
+    await client.query('ALTER TABLE lpg_noon_logs ADD COLUMN IF NOT EXISTS fw_shore_water NUMERIC(8,2)').catch(()=>{});
+    // ── Ensure unique constraint exists ──────────────────────────────────────
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname='lpg_noon_logs_vessel_id_record_date_record_time_status_key'
+        ) THEN
+          ALTER TABLE lpg_noon_logs
+          ADD CONSTRAINT lpg_noon_logs_vessel_id_record_date_record_time_status_key
+          UNIQUE (vessel_id, record_date, record_time, status);
+        END IF;
+      END $$
+    `).catch(()=>{});
     // ── Vessel consolidation migration ─────────────────────────────────────
     // Ensure canonical vessels exist
     await client.query(`
