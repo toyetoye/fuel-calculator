@@ -10,6 +10,7 @@ import VesselManage from './pages/VesselManage';
 import UserManage from './pages/UserManage';
 import FuelPrices from './pages/FuelPrices';
 import { LPGDashboard, LPGHistory, LPGMonthDetail, LPGNoonForm, LPGImport } from './pages/LPGFuel';
+import LNGDashboard from './pages/LNGDashboard';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -29,11 +30,13 @@ function Sidebar() {
   const isAdmin = r === 'admin';
   const isManager = r === 'manager';
   const isSup = r === 'superintendent';
-  const hasLpg = isAdmin || isManager || isSup ||
-    (user?.vessel_names || []).some(v => v.toLowerCase().includes('alfred temile'));
-  const hasLng = isAdmin || isManager || isSup ||
-    (user?.vessel_names || []).some(v => !v.toLowerCase().includes('alfred temile'));
-  const lpgOnly = hasLpg && !hasLng && !isAdmin && !isManager && !isSup;
+  const isVessel = r === 'vessel';
+
+  const vesselNames = user?.vessel_names || [];
+  const hasLpg = vesselNames.some(v => v.toLowerCase().includes('alfred temile'));
+  const hasLng = vesselNames.some(v => !v.toLowerCase().includes('alfred temile')) || isAdmin || isManager || isSup;
+  const lpgOnly = isVessel && hasLpg && !hasLng;
+  const lngOnly = isVessel && hasLng && !hasLpg;
 
   const active = (path) => loc.pathname === path || loc.pathname.startsWith(path + '/');
 
@@ -55,32 +58,54 @@ function Sidebar() {
           </div>
         </div>
       </div>
+
       <nav className="flex-1 p-3 space-y-1">
-        {lpgOnly ? (
+        {/* Pure LPG vessel user */}
+        {lpgOnly && (
           <>
             {btn('/lpg',         'Dashboard',  '◈')}
             {btn('/lpg/noon',    'Daily Noon', '✏️')}
             {btn('/lpg/history', 'History',    '📋')}
           </>
-        ) : (
+        )}
+
+        {/* Pure LNG vessel user */}
+        {lngOnly && (
           <>
-            {(isAdmin || isManager || isSup || hasLng) && btn('/voyages', 'Voyages', '⊞')}
+            {btn('/lng/dashboard', 'Dashboard', '◈')}
+            {btn('/voyages',       'Voyages',   '⊞')}
+          </>
+        )}
+
+        {/* Admin / Superintendent / Manager — full nav */}
+        {(isAdmin || isManager || isSup) && (
+          <>
+            {/* LNG section */}
+            <div className="text-[10px] text-slate-600 uppercase tracking-widest px-3 pt-2 pb-1">LNG Fleet</div>
+            {btn('/lng/dashboard', 'Dashboard',   '◈')}
+            {btn('/voyages',       'Voyages',      '⊞')}
             {(isAdmin || isSup) && btn('/voyages/new', 'New Voyage', '⊕')}
-            {hasLpg && (
+
+            {/* LPG section */}
+            <div className="text-[10px] text-slate-600 uppercase tracking-widest px-3 pt-3 pb-1">LPG Fleet</div>
+            {btn('/lpg',         'Dashboard',  '◈')}
+            {btn('/lpg/noon',    'Daily Noon', '✏️')}
+            {btn('/lpg/history', 'History',    '📋')}
+            {isAdmin && btn('/lpg/import', 'Import XLS', '📊')}
+
+            {/* Admin tools */}
+            {isAdmin && (
               <>
-                <div className="text-[10px] text-slate-600 uppercase tracking-widest px-3 pt-3 pb-1">LPG</div>
-                {btn('/lpg',         'Dashboard',  '◈')}
-                {btn('/lpg/noon',    'Daily Noon', '✏️')}
-                {btn('/lpg/history', 'History',    '📋')}
-                {isAdmin && btn('/lpg/import', 'Import XLS', '📊')}
+                <div className="text-[10px] text-slate-600 uppercase tracking-widest px-3 pt-3 pb-1">Admin</div>
+                {btn('/vessels',     'LNG Vessels', '⚓')}
+                {btn('/fuel-prices', 'Fuel Prices', '⊙')}
+                {btn('/users',       'Users',       '◈')}
               </>
             )}
-            {isAdmin && btn('/vessels',     'LNG Vessels', '⚓')}
-            {isAdmin && btn('/fuel-prices', 'Fuel Prices', '⊙')}
-            {isAdmin && btn('/users',       'Users',       '◈')}
           </>
         )}
       </nav>
+
       <div className="p-4 border-t border-white/5">
         <div className="text-xs text-slate-500 mb-1">{user?.display_name}</div>
         <button onClick={api.logout} className="text-xs text-red-400 hover:text-red-300">Sign Out</button>
@@ -104,15 +129,16 @@ export default function App() {
             <Route path="/voyages/:id/edit"  element={<ProtectedRoute><VoyageForm /></ProtectedRoute>} />
             <Route path="/voyages/import"    element={<VoyageImport />} />
             <Route path="/voyages/:id"       element={<ProtectedRoute><VoyageDetail /></ProtectedRoute>} />
-            <Route path="/lpg"              element={<ProtectedRoute><LPGDashboard /></ProtectedRoute>} />
-            <Route path="/lpg/noon"         element={<ProtectedRoute><LPGNoonForm /></ProtectedRoute>} />
-            <Route path="/lpg/history"      element={<ProtectedRoute><LPGHistory /></ProtectedRoute>} />
+            <Route path="/lng/dashboard"     element={<ProtectedRoute><LNGDashboard /></ProtectedRoute>} />
+            <Route path="/lpg"               element={<ProtectedRoute><LPGDashboard /></ProtectedRoute>} />
+            <Route path="/lpg/noon"          element={<ProtectedRoute><LPGNoonForm /></ProtectedRoute>} />
+            <Route path="/lpg/history"       element={<ProtectedRoute><LPGHistory /></ProtectedRoute>} />
             <Route path="/lpg/history/:month_key" element={<ProtectedRoute><LPGMonthDetail /></ProtectedRoute>} />
-            <Route path="/lpg/import"       element={<ProtectedRoute><LPGImport /></ProtectedRoute>} />
-            <Route path="/vessels"          element={<ProtectedRoute><VesselManage /></ProtectedRoute>} />
-            <Route path="/fuel-prices"      element={<ProtectedRoute><FuelPrices /></ProtectedRoute>} />
-            <Route path="/users"            element={<ProtectedRoute><UserManage /></ProtectedRoute>} />
-            <Route path="*"                 element={<Navigate to={user ? '/lpg' : '/login'} />} />
+            <Route path="/lpg/import"        element={<ProtectedRoute><LPGImport /></ProtectedRoute>} />
+            <Route path="/vessels"           element={<ProtectedRoute><VesselManage /></ProtectedRoute>} />
+            <Route path="/fuel-prices"       element={<ProtectedRoute><FuelPrices /></ProtectedRoute>} />
+            <Route path="/users"             element={<ProtectedRoute><UserManage /></ProtectedRoute>} />
+            <Route path="*"                  element={<Navigate to={user ? '/lpg' : '/login'} />} />
           </Routes>
         </div>
       </div>
