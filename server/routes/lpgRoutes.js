@@ -31,10 +31,10 @@ async function initLpgSchema() {
         id          SERIAL PRIMARY KEY,
         vessel_id   INTEGER REFERENCES lpg_vessels(id) ON DELETE CASCADE,
         record_date DATE NOT NULL,
-        record_time VARCHAR(20),
+        record_time TEXT,
         mode        VARCHAR(80),
         status      TEXT,
-        voyage_number VARCHAR(30),
+        voyage_number TEXT,
         vessel_position_status TEXT,
         berth_hrs NUMERIC(6,2), anch_drift_hrs NUMERIC(6,2), manv_hrs NUMERIC(6,2),
         sea_stm_hrs NUMERIC(6,2), total_hrs NUMERIC(6,2),
@@ -87,6 +87,10 @@ async function initLpgSchema() {
       VALUES ('Alfred Temile', '9859882', 5400, 'FRPG')
       ON CONFLICT (name) DO NOTHING
     `);
+    // Widen columns on existing deployments
+    await client.query('ALTER TABLE lpg_noon_logs ALTER COLUMN record_time TYPE TEXT');
+    await client.query('ALTER TABLE lpg_noon_logs ALTER COLUMN voyage_number TYPE TEXT');
+    await client.query('ALTER TABLE lpg_noon_logs ALTER COLUMN mode TYPE TEXT');
     console.log('[LPG] Schema ready');
   } catch(e) { console.error('[LPG] Schema error:', e.message); }
   finally { client.release(); }
