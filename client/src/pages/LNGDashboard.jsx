@@ -52,7 +52,7 @@ function LineChart({ data, yKey, color='#3B82F6', warningLine, yUnit='', tooltip
           const v=(maxV/4)*i;
           return <g key={i}>
             <line x1={PL} y1={yp(v)} x2={W-PR} y2={yp(v)} stroke="rgba(255,255,255,0.04)" strokeWidth={1}/>
-            <text x={PL-4} y={yp(v)+4} fill="#475569" fontSize={9} textAnchor="end">{v<1000?v.toFixed(v<10?1:0):Math.round(v/1000)+'k'}{yUnit}</text>
+            <text x={PL-4} y={yp(v)+4} fill="var(--chart-label,#94a3b8)" fontSize={9} textAnchor="end">{v<1000?v.toFixed(v<10?1:0):Math.round(v/1000)+'k'}{yUnit}</text>
           </g>;
         })}
         {warningLine!=null&&<><line x1={PL} y1={yp(warningLine)} x2={W-PR} y2={yp(warningLine)} stroke="#F59E0B" strokeWidth={1} strokeDasharray="4,2"/>
@@ -67,7 +67,7 @@ function LineChart({ data, yKey, color='#3B82F6', warningLine, yUnit='', tooltip
           />
         ))}
         {data.map((d,i)=>i%(Math.ceil(data.length/6))===0&&(
-          <text key={i} x={xp(i)} y={H-4} fill="#475569" fontSize={9} textAnchor="middle">{d.month_label}</text>
+          <text key={i} x={xp(i)} y={H-4} fill="var(--chart-label,#94a3b8)" fontSize={9} textAnchor="middle">{d.month_label}</text>
         ))}
       </svg>
     </>
@@ -91,7 +91,7 @@ function BarChart({ data, yKey, color='#0F766E', yUnit='', tooltipLabel }) {
           const v=(maxV/4)*i;
           return <g key={i}>
             <line x1={PL} y1={PT+cH-(v/maxV)*cH} x2={W-PR} y2={PT+cH-(v/maxV)*cH} stroke="rgba(255,255,255,0.04)" strokeWidth={1}/>
-            <text x={PL-4} y={PT+cH-(v/maxV)*cH+4} fill="#475569" fontSize={9} textAnchor="end">{v<1000?v.toFixed(v<10?1:0):Math.round(v/1000)+'k'}{yUnit}</text>
+            <text x={PL-4} y={PT+cH-(v/maxV)*cH+4} fill="var(--chart-label,#94a3b8)" fontSize={9} textAnchor="end">{v<1000?v.toFixed(v<10?1:0):Math.round(v/1000)+'k'}{yUnit}</text>
           </g>;
         })}
         {vals.map((v,i)=>{
@@ -103,7 +103,7 @@ function BarChart({ data, yKey, color='#0F766E', yUnit='', tooltipLabel }) {
           />;
         })}
         {data.map((d,i)=>i%(Math.ceil(data.length/6))===0&&(
-          <text key={i} x={PL+i*gap+gap/2} y={H-4} fill="#475569" fontSize={9} textAnchor="middle">{d.month_label}</text>
+          <text key={i} x={PL+i*gap+gap/2} y={H-4} fill="var(--chart-label,#94a3b8)" fontSize={9} textAnchor="middle">{d.month_label}</text>
         ))}
       </svg>
     </>
@@ -252,14 +252,14 @@ export default function LNGDashboard() {
             <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
               <div className="mb-2">
                 <h3 className="text-sm font-semibold text-slate-200">HFO Consumption</h3>
-                <p className="text-xs text-slate-500">Monthly total (MT)</p>
+                <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Monthly total (MT)</p>
               </div>
               <BarChart data={monthly} yKey="hfo_consumed" color="#B45309" yUnit=" MT" tooltipLabel="HFO consumed"/>
             </div>
             <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
               <div className="mb-2">
                 <h3 className="text-sm font-semibold text-slate-200">Net Excess Fuel Trend</h3>
-                <p className="text-xs text-slate-500">vs charter party allowance (MT) — above 0 = chargeable</p>
+                <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>vs charter party allowance (MT) — above 0 = chargeable</p>
               </div>
               <LineChart data={monthly} yKey="net_excess" color="#EF4444" yUnit=" MT" warningLine={0} tooltipLabel="Net excess fuel (MT)"/>
             </div>
@@ -269,14 +269,14 @@ export default function LNGDashboard() {
             <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
               <div className="mb-2">
                 <h3 className="text-sm font-semibold text-slate-200">Distance Steamed</h3>
-                <p className="text-xs text-slate-500">Monthly total (NM)</p>
+                <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Monthly total (NM)</p>
               </div>
               <BarChart data={monthly} yKey="distance_nm" color="#0F766E" yUnit=" NM" tooltipLabel="Distance steamed"/>
             </div>
             <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
               <div className="mb-2">
                 <h3 className="text-sm font-semibold text-slate-200">Sea Steam Hours</h3>
-                <p className="text-xs text-slate-500">Monthly total (hrs)</p>
+                <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Monthly total (hrs)</p>
               </div>
               <LineChart data={monthly} yKey="steaming_hrs" color="#A78BFA" yUnit=" hrs" tooltipLabel="Sea steaming hours"/>
             </div>
