@@ -119,7 +119,8 @@ function CIIBadge({ rating, attained, required }) {
       <div className="text-6xl font-bold" style={{color:col}}>{rating||'—'}</div>
       <div className="text-xs text-slate-400 mt-2">Attained: <span style={{color:col}}>{fmt(attained,3)}</span></div>
       <div className="text-xs text-slate-500">Required: {fmt(required,3)}</div>
-      <div className="text-[10px] text-slate-600 mt-1 text-center">LNG Carrier — MEPC.339(76)</div>
+      <div className="text-[10px] text-slate-500 mt-1 text-center">LNG Carrier — MEPC.339(76)</div>
+      <div className="text-[10px] text-slate-600 mt-0.5 text-center px-2">CO₂ = HFO×3.114 + FOE×2.750 (t/NM)</div>
       <div className="flex gap-1 mt-2">
         {['A','B','C','D','E'].map(l=>(
           <div key={l} className="px-2 py-0.5 rounded text-xs font-bold" style={{background:colors[l],color:'#fff',opacity:l===rating?1:0.3}}>{l}</div>
@@ -292,7 +293,7 @@ export default function LNGDashboard() {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
-                    {['Month','Voyages','Sea Hrs','Distance NM','HFO (MT)','FOE (MT)','Net Excess','Status'].map(h=>(
+                    {['Month','Voyages','Sea Hrs','Distance NM','HFO (MT)','FOE (MT)','Att. CII','Net Excess','Status'].map(h=>(
                       <th key={h} className="px-3 py-2.5 text-left text-teal-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
                     ))}
                   </tr></thead>
@@ -308,6 +309,10 @@ export default function LNGDashboard() {
                           <td className="px-3 py-2 text-right text-slate-300">{fmt0(m.distance_nm)}</td>
                           <td className="px-3 py-2 text-right font-semibold text-amber-300">{fmt(m.hfo_consumed)}</td>
                           <td className="px-3 py-2 text-right text-slate-300">{fmt(m.foe_consumed,3)}</td>
+                          <td className="px-3 py-2 text-right text-xs font-mono"
+                            style={{color:parseFloat(m.attained_cii)>8.943?'#EF4444':parseFloat(m.attained_cii)>0?'#22C55E':'#475569'}}>
+                            {m.attained_cii||'—'}
+                          </td>
                           <td className="px-3 py-2 text-right font-semibold" style={{color:excess>0?'#EF4444':'#22C55E'}}>{fmt(excess)}</td>
                           <td className="px-3 py-2">
                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${excess>0?'bg-red-900/40 text-red-300':'bg-green-900/40 text-green-300'}`}>
