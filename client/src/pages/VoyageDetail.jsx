@@ -83,17 +83,17 @@ export default function VoyageDetail() {
         <div>
           <h1 className="text-xl font-bold text-slate-100">{voyage.vessel_name} — {voyage.voyage_number}</h1>
           <div className="flex items-center gap-3 mt-1">
-            <span className={`px-2 py-0.5 rounded text-xs font-medium border ${voyage.leg_type === 'LADEN' ? 'bg-blue-900/30 text-blue-300 border-blue-700/40' : 'bg-slate-700/30 text-slate-300 border-slate-600/40'}`}>{voyage.leg_type}</span>
-            <span className={`px-2 py-0.5 rounded text-xs font-medium border ${isFinalised ? 'bg-emerald-900/30 text-emerald-300 border-emerald-700/40' : 'bg-amber-900/30 text-amber-300 border-amber-700/40'}`}>{voyage.status}</span>
+            <span className={`px-2 py-0.5 rounded text-xs font-bold tracking-wide ${voyage.leg_type === 'LADEN' ? 'bg-blue-600 text-white' : 'bg-slate-500 text-white'}`}>{voyage.leg_type}</span>
+            <span className={`px-2 py-0.5 rounded text-xs font-bold tracking-wide ${isFinalised ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'}`}>{voyage.status}</span>
             <span className="text-xs text-slate-500">{voyage.discharge_port || voyage.loading_port}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {canEdit && <button onClick={() => nav(`/voyages/${id}/edit`)} className="px-3 py-1.5 rounded-lg text-xs text-amber-300 bg-amber-900/20 border border-amber-800/30">Edit Voyage</button>}
-          {!isManager && !isFinalised && <button onClick={async () => { if (confirm('Finalise this voyage? This locks the calculation.')) { await api.finaliseVoyage(id); loadAll(); } }} className="px-3 py-1.5 rounded-lg text-xs text-emerald-300 bg-emerald-900/20 border border-emerald-800/30">Finalise</button>}
-          {canReview && isFinalised && <button onClick={async () => { if (confirm('Unfinalise this voyage? This reopens it for editing.')) { await api.unfinaliseVoyage(id); loadAll(); } }} className="px-3 py-1.5 rounded-lg text-xs text-amber-300 bg-amber-900/20 border border-amber-800/30">Unfinalise</button>}
-          {user?.role === 'admin' && <button onClick={async () => { if (!confirm(`Delete voyage ${voyage.voyage_number}? This removes all noon reports.`)) return; if (prompt('Type DELETE to confirm:') !== 'DELETE') return; try { await api.deleteVoyage(id); nav('/voyages'); } catch(e) { alert(e.message); } }} className="px-3 py-1.5 rounded-lg text-xs text-red-400 bg-red-900/20 border border-red-800/30">Delete</button>}
-          <a href={api.getPdfUrl(id)} target="_blank" className="px-3 py-1.5 rounded-lg text-xs text-slate-300 bg-slate-800/50 border border-white/10">📄 Export PDF</a>
+          {canEdit && <button onClick={() => nav(`/voyages/${id}/edit`)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-500 transition-colors">Edit Voyage</button>}
+          {!isManager && !isFinalised && <button onClick={async () => { if (confirm('Finalise this voyage? This locks the calculation.')) { await api.finaliseVoyage(id); loadAll(); } }} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition-colors">Finalise</button>}
+          {canReview && isFinalised && <button onClick={async () => { if (confirm('Unfinalise this voyage? This reopens it for editing.')) { await api.unfinaliseVoyage(id); loadAll(); } }} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-500 transition-colors">Unfinalise</button>}
+          {user?.role === 'admin' && <button onClick={async () => { if (!confirm(`Delete voyage ${voyage.voyage_number}? This removes all noon reports.`)) return; if (prompt('Type DELETE to confirm:') !== 'DELETE') return; try { await api.deleteVoyage(id); nav('/voyages'); } catch(e) { alert(e.message); } }} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-500 transition-colors">Delete</button>}
+          <a href={api.getPdfUrl(id)} target="_blank" className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-600 text-white hover:bg-slate-500 transition-colors">📄 Export PDF</a>
         </div>
       </div>
 
@@ -131,7 +131,7 @@ export default function VoyageDetail() {
                   const isEditing = editRow === r.id;
                   const diffColor = r.difference > 0 ? '#34D399' : r.difference < -5 ? '#F87171' : '#FBBF24';
                   return (
-                    <tr key={r.id || i} className={`border-b border-white/[0.03] ${r.is_excluded ? 'bg-red-900/5' : 'hover:bg-white/[0.02]'}`}>
+                    <tr key={r.id || i} style={{ background: r.is_excluded ? 'rgba(220,38,38,0.08)' : i % 2 === 0 ? 'var(--row-even)' : 'var(--row-odd)' }} className="border-b border-white/[0.03] hover:brightness-110 transition-all">
                       <td className="px-2 py-2 font-mono text-amber-300">{r.day_number}</td>
                       <td className="px-2 py-2 text-slate-400">{r.report_date ? new Date(r.report_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : ''}</td>
                       <td className="px-2 py-2 font-mono text-right">{fmt(r.steaming_hours, 1)}</td>
@@ -404,7 +404,7 @@ export default function VoyageDetail() {
                     {(calc.cii_daily || []).map((r, i) => {
                       const ratingColor = { A: '#34D399', B: '#67E8F9', C: '#FBBF24', D: '#F97316', E: '#F87171' };
                       return (
-                        <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                        <tr key={i} style={{ background: i % 2 === 0 ? 'var(--row-even)' : 'var(--row-odd)' }} className="border-b border-white/[0.03] hover:brightness-110 transition-all">
                           <td className="px-3 py-2 font-mono text-amber-300">{r.day}</td>
                           <td className="px-3 py-2 text-slate-200">{r.date ? new Date(r.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : ''}</td>
                           <td className="px-3 py-2 font-mono text-right">{fmt(r.hfo, 1)}</td>
@@ -460,8 +460,8 @@ function InlineEdit({ report, weatherOptions, inp, selInp, saving, onSave, onCan
       <td></td>
       <td className="px-2 py-2"><input value={r.remarks || ''} onChange={e => set('remarks', e.target.value)} className={`${selInp} w-24`} placeholder="Remarks" /></td>
       <td className="px-2 py-2 flex gap-1">
-        <button onClick={() => onSave(r)} disabled={saving} className="px-2 py-0.5 rounded text-[10px] text-emerald-300 bg-emerald-900/30 border border-emerald-800/30">{saving ? '...' : '✓'}</button>
-        <button onClick={onCancel} className="px-2 py-0.5 rounded text-[10px] text-slate-400 bg-slate-800/30 border border-white/10">✕</button>
+        <button onClick={() => onSave(r)} disabled={saving} className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-600 text-white">{saving ? '...' : '✓'}</button>
+        <button onClick={onCancel} className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-600 text-white">✕</button>
       </td>
     </tr>
   );
