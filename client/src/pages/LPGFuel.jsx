@@ -328,6 +328,72 @@ export function LPGDashboard() {
   );
 }
 
+
+// ── Debug panel (admin only, shows when no months found) ──────────────────────
+function LPGDebugPanel({ vesselId }) {
+  const { user } = useAuth();
+  const [info, setInfo] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const isAdmin = user?.role === 'admin';
+
+  const run = () => {
+    setLoading(true);
+    api.get('/api/lpg/debug')
+      .then(d => { setInfo(d); setLoading(false); })
+      .catch(e => { setInfo({ error: e.message }); setLoading(false); });
+  };
+
+  if (!isAdmin) return null;
+  return (
+    <div className="mt-8 rounded-xl border border-amber-800/30 bg-amber-900/10 p-5 text-sm space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-amber-300 font-semibold text-xs uppercase tracking-widest">🔍 Admin Diagnostic</div>
+        <button onClick={run} disabled={loading}
+          className="px-3 py-1 rounded bg-amber-700 text-white text-xs font-semibold hover:bg-amber-600 disabled:opacity-50">
+          {loading ? 'Querying…' : 'Run DB Check'}
+        </button>
+      </div>
+      {info && !info.error && (
+        <div className="space-y-3 font-mono text-xs">
+          <div>
+            <div className="text-slate-400 mb-1 font-sans font-semibold">lpg_vessels ({info.vessels?.length} rows)</div>
+            {info.vessels?.map(v => (
+              <div key={v.id} className="text-slate-300">id={v.id} | {v.name} | imo={v.imo} | active={String(v.active)}</div>
+            ))}
+          </div>
+          <div>
+            <div className="text-slate-400 mb-1 font-sans font-semibold">Record counts per vessel</div>
+            {info.counts?.length
+              ? info.counts.map(c => (
+                  <div key={c.vessel_id} className={`${String(c.vessel_id) === String(vesselId) ? 'text-green-300' : 'text-slate-300'}`}>
+                    vessel_id={c.vessel_id} — {c.records} records | {c.earliest} → {c.latest}
+                    {String(c.vessel_id) === String(vesselId) && ' ← queried vessel'}
+                  </div>
+                ))
+              : <div className="text-red-300">No records in lpg_noon_logs at all</div>
+            }
+          </div>
+          <div>
+            <div className="text-slate-400 mb-1 font-sans font-semibold">Orphan records: {info.orphans?.orphan_count}</div>
+            <div className="text-slate-400">Table columns: {info.column_count}</div>
+          </div>
+          {info.sample?.length > 0 && (
+            <div>
+              <div className="text-slate-400 mb-1 font-sans font-semibold">5 most recently imported rows</div>
+              {info.sample.map((r,i) => (
+                <div key={i} className="text-slate-300">
+                  id={r.id} vessel_id={r.vessel_id} date={r.record_date} voy={r.voyage_number} vlsfo={r.vlsfo_total_cons}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {info?.error && <div className="text-red-300 font-mono text-xs">{info.error}</div>}
+    </div>
+  );
+}
+
 // ─── History (monthly list) ───────────────────────────────────────────────────
 export function LPGHistory() {
   const nav = useNavigate();
@@ -379,7 +445,8 @@ export function LPGHistory() {
       ) : months.length === 0 ? (
         <div className="text-center py-20 text-slate-500">
           <div className="text-4xl mb-3">📋</div>
-          <div>No records yet.</div>
+          <div>No records found for this vessel.</div>
+          <LPGDebugPanel vesselId={vesselId} />
         </div>
       ) : (
         <div className="rounded-xl border border-white/5 overflow-hidden" style={{background:'var(--card-bg)'}}>
