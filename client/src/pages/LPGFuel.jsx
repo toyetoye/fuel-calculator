@@ -163,24 +163,32 @@ export function LPGDashboard() {
   const [data, setData] = useState(null);
   const [vessels, setVessels] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchErr, setFetchErr] = useState('');
   const { vesselId, setVesselId, isVesselUser } = useVesselSelector(vessels, user);
 
   useEffect(() => {
-    api.get('/api/lpg/vessels').then(r => setVessels(r));
+    api.get('/api/lpg/vessels').then(r => setVessels(r)).catch(e => setFetchErr(e.message));
   }, []);
 
   useEffect(() => {
     if (!vesselId) return;
-    setLoading(true);
+    setLoading(true); setFetchErr('');
     api.get(`/api/lpg/analytics?vessel_id=${vesselId}`)
       .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [vesselId]);
+      .catch(e => { setFetchErr(e.message || 'Failed to load analytics'); setLoading(false); });
+  }, [vesselId, vessels.length]);
 
   const isAdmin = ['admin','manager','superintendent'].includes(user?.role);
 
   if (loading) return <div className="p-6 text-center text-slate-500 pt-20">Loading analytics…</div>;
-  if (!data) return <div className="p-6 text-red-400">Failed to load analytics.</div>;
+  if (fetchErr) return (
+    <div className="p-6 max-w-2xl mx-auto mt-12 rounded-xl border border-red-800/40 bg-red-900/10 text-red-300 text-sm space-y-2">
+      <div className="font-semibold text-red-200 text-base">Analytics failed to load</div>
+      <div className="font-mono text-xs bg-red-950/40 rounded p-3 break-all">{fetchErr}</div>
+      <div className="text-slate-400 text-xs">This usually means a database column is missing. The schema migration should fix this on next deploy — try refreshing.</div>
+    </div>
+  );
+  if (!data) return <div className="p-6 text-red-400">No data returned.</div>;
 
   const { monthly, totals, cii, anomalies } = data;
 
@@ -327,19 +335,20 @@ export function LPGHistory() {
   const [months, setMonths] = useState([]);
   const [vessels, setVessels] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchErr, setFetchErr] = useState('');
   const { vesselId, setVesselId, isVesselUser } = useVesselSelector(vessels, user);
 
   useEffect(() => {
-    api.get('/api/lpg/vessels').then(r => setVessels(r));
+    api.get('/api/lpg/vessels').then(r => setVessels(r)).catch(e => setFetchErr(e.message));
   }, []);
 
   useEffect(() => {
     if (!vesselId) return;
-    setLoading(true);
+    setLoading(true); setFetchErr('');
     api.get(`/api/lpg/months?vessel_id=${vesselId}`)
       .then(r => { setMonths(r); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [vesselId]);
+      .catch(e => { setFetchErr(e.message || 'Failed to load months'); setLoading(false); });
+  }, [vesselId, vessels.length]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -359,7 +368,13 @@ export function LPGHistory() {
         </div>
       </div>
 
-      {loading ? (
+      {fetchErr ? (
+        <div className="rounded-xl border border-red-800/40 bg-red-900/10 text-red-300 text-sm p-5 space-y-2">
+          <div className="font-semibold text-red-200">Failed to load records</div>
+          <div className="font-mono text-xs bg-red-950/40 rounded p-3 break-all">{fetchErr}</div>
+          <div className="text-slate-400 text-xs">A database schema migration will run on next deploy. Try refreshing.</div>
+        </div>
+      ) : loading ? (
         <div className="text-center py-20 text-slate-500">Loading…</div>
       ) : months.length === 0 ? (
         <div className="text-center py-20 text-slate-500">
@@ -417,7 +432,7 @@ export function LPGMonthDetail() {
     const q = vessel_id ? `?vessel_id=${vessel_id}` : '';
     api.get(`/api/lpg/months/${month_key}${q}`)
       .then(r => { setRecords(r); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch(e => { console.error('[LPGMonthDetail]', e); setLoading(false); });
   }, [month_key]);
 
   if (loading) return <div className="p-6 text-center text-slate-500">Loading…</div>;
