@@ -657,4 +657,34 @@ router.put('/noon/:id', authenticate, lpgAccess, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+
+// ── Debug: raw DB state (admin only) ──────────────────────────────────────────
+router.get('/debug', authenticate, adminOnly, async (req, res) => {
+  try {
+    const vessels  = (await pool.query('SELECT id, name, imo, active FROM lpg_vessels ORDER BY id')).rows;
+    const counts   = (await pool.query(`
+      SELECT vessel_id, COUNT(*)::int AS records,
+             MIN(record_date) AS earliest, MAX(record_date) AS latest
+      FROM lpg_noon_logs GROUP BY vessel_id ORDER BY vessel_id
+    `)).rows;
+    const sample   = (await pool.query(`
+      SELECT id, vessel_id, record_date, record_time, status, voyage_number,
+             vlsfo_total_cons, co2_emitted_mt, obs_dist
+      FROM lpg_noon_logs ORDER BY imported_at DESC LIMIT 5
+    `)).rows;
+    const orphans  = (await pool.query(`
+      SELECT COUNT(*)::int AS orphan_count
+      FROM lpg_noon_logs n
+      LEFT JOIN lpg_vessels v ON v.id = n.vessel_id
+      WHERE v.id IS NULL
+    `)).rows[0];
+    const colcheck = (await pool.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema='fuel' AND table_name='lpg_noon_logs'
+      ORDER BY ordinal_position
+    `)).rows.map(r => r.column_name);
+    res.json({ vessels, counts, sample, orphans, column_count: colcheck.length, columns: colcheck });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;
