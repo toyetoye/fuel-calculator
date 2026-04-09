@@ -47,7 +47,7 @@ async function initLpgSchema() {
         me_torque NUMERIC(10,2), me_calc_con_day NUMERIC(8,4),
         fo_density_15c NUMERIC(6,4),
         ulsfo_me_flmr NUMERIC(12,1), ulsfo_me_temp NUMERIC(6,1),
-        ulsfo_me_cons_accum NUMERIC(12,1), ulsfo_cons_me NUMERIC(8,4),
+        ulsfo_me_cons_accum NUMERIC(14,2), ulsfo_cons_me NUMERIC(14,4),
         ulsfo_ae_in NUMERIC(12,1), ulsfo_ae_out NUMERIC(12,1), ulsfo_ae_temp NUMERIC(6,1),
         ulsfo_ae_flow NUMERIC(10,2), ulsfo_cons_ae_flow NUMERIC(8,4),
         ulsfo_blr_flmr NUMERIC(12,1), ulsfo_blr_temp NUMERIC(6,1),
@@ -89,6 +89,9 @@ async function initLpgSchema() {
     `);
     // Widen columns on existing deployments
     await client.query('ALTER TABLE lpg_noon_logs ALTER COLUMN record_time TYPE TEXT');
+    await client.query('ALTER TABLE lpg_noon_logs ALTER COLUMN voyage_number TYPE TEXT');
+    await client.query('ALTER TABLE lpg_noon_logs ALTER COLUMN mode TYPE TEXT');
+    await client.query('ALTER TABLE lpg_noon_logs ALTER COLUMN ulsfo_cons_me TYPE NUMERIC(14,4) USING ulsfo_cons_me::NUMERIC(14,4)').catch(()=>{});
     await client.query('ALTER TABLE lpg_noon_logs ALTER COLUMN voyage_number TYPE TEXT');
     await client.query('ALTER TABLE lpg_noon_logs ALTER COLUMN mode TYPE TEXT');
     console.log('[LPG] Schema ready');
