@@ -1,6 +1,6 @@
 {
   "name": "fleet-fuel-calculator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LNG Excess Fuel Consumption Calculator",
   "scripts": {
     "dev:server": "node server/index.js",
