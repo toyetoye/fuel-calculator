@@ -187,11 +187,11 @@ export default function LNGDashboard() {
             </select>
           )}
           {isVessel && (
-            <div className="px-3 py-1.5 rounded-lg bg-slate-800/50 border border-white/5 text-slate-300 text-sm">{selected}</div>
+            <div className="px-3 py-1.5 rounded-lg bg-slate-700 text-white text-sm font-medium">{selected}</div>
           )}
           <HelpButton type="lng" />
           <button onClick={()=>nav('/voyages')}
-            className="px-4 py-1.5 rounded-lg border border-white/10 text-slate-300 text-sm hover:bg-white/5 transition-colors">
+            className="px-4 py-1.5 rounded-lg bg-slate-700 text-white text-sm font-medium hover:bg-slate-600 transition-colors">
             Voyages →
           </button>
         </div>
@@ -220,7 +220,7 @@ export default function LNGDashboard() {
             <div className="md:col-span-2 rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-slate-200">Alerts & Anomalies</h3>
-                <span className={`px-2 py-0.5 text-xs rounded ${anomalies.length>0?'bg-amber-900/40 text-amber-300':'bg-green-900/40 text-green-300'}`}>
+                <span className={`px-2 py-0.5 text-xs rounded font-bold ${anomalies.length>0?'bg-amber-600 text-white':'bg-emerald-600 text-white'}`}>
                   {anomalies.length>0?`${anomalies.length} items`:'✓ Clear'}
                 </span>
               </div>
@@ -298,10 +298,10 @@ export default function LNGDashboard() {
                     ))}
                   </tr></thead>
                   <tbody>
-                    {monthly.slice().reverse().map((m,i)=>{
+                    {monthly.slice().reverse().map((m,idx)=>{
                       const excess=parseFloat(m.net_excess)||0;
                       return (
-                        <tr key={m.month_key} className="border-t border-white/5 hover:bg-white/5"
+                        <tr key={m.month_key} style={{ background: idx % 2 === 0 ? 'var(--row-even)' : 'var(--row-odd)' }} className="border-t border-white/5 hover:brightness-110 transition-all"
                           style={{background:i%2===0?'var(--table-row-bg,rgba(15,23,42,0.3))':'transparent'}}>
                           <td className="px-3 py-2 font-medium text-teal-300">{m.month_label}</td>
                           <td className="px-3 py-2 text-right text-slate-400">{m.voyage_count}</td>
@@ -315,7 +315,7 @@ export default function LNGDashboard() {
                           </td>
                           <td className="px-3 py-2 text-right font-semibold" style={{color:excess>0?'#EF4444':'#22C55E'}}>{fmt(excess)}</td>
                           <td className="px-3 py-2">
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${excess>0?'bg-red-900/40 text-red-300':'bg-green-900/40 text-green-300'}`}>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${excess>0?'bg-red-600 text-white':'bg-emerald-600 text-white'}`}>
                               {excess>0?'Excess':'Within'}
                             </span>
                           </td>
