@@ -189,7 +189,7 @@ export default function VoyageDetail() {
               { l: 'Guaranteed Fuel', v: `${fmt(calc.guaranteed_passage_fuel)} MT`, c: '#34D399' },
               { l: 'Excess Fuel', v: `${fmt(calc.excess_fuel)} MT`, c: calc.excess_fuel > 0 ? '#F87171' : '#34D399' },
             ].map((k, i) => (
-              <div key={i} className="rounded-xl p-5 border border-white/5" style={{ background: 'linear-gradient(135deg,rgba(15,23,42,0.9),rgba(30,41,59,0.7))' }}>
+              <div key={i} className="rounded-xl p-5 border border-white/5" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)' }}>
                 <div className="text-xs uppercase tracking-widest text-slate-500 mb-2">{k.l}</div>
                 <div className="text-xl font-bold" style={{ color: k.c }}>{k.v}</div>
               </div>
@@ -346,7 +346,7 @@ export default function VoyageDetail() {
                   { l: 'Required CII', v: fmt(calc.cii_required, 2), c: '#94A3B8' },
                   { l: 'Total CO₂ (MT)', v: fmt(calc.cii_total_co2, 1), c: '#67E8F9' },
                 ].map((k, i) => (
-                  <div key={i} className="rounded-xl p-5 border border-white/5" style={{ background: 'linear-gradient(135deg,rgba(15,23,42,0.9),rgba(30,41,59,0.7))' }}>
+                  <div key={i} className="rounded-xl p-5 border border-white/5" style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)' }}>
                     <div className="text-xs uppercase tracking-widest text-slate-500 mb-2">{k.l}</div>
                     <div className="text-2xl font-bold" style={{ color: k.c }}>{k.v}</div>
                   </div>
