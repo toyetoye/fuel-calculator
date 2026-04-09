@@ -119,7 +119,7 @@ export default function VoyageDetail() {
         <div className="space-y-4">
           {canEdit && <div className="flex justify-end"><button onClick={startNewRow} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg,#B45309,#D97706)' }}>+ Add Day</button></div>}
 
-          <div className="rounded-xl border border-white/5 overflow-x-auto" style={{ background: 'rgba(15,23,42,0.6)' }}>
+          <div className="rounded-xl border border-white/5 overflow-x-auto" style={{ background: 'var(--card-bg)' }}>
             <table className="w-full text-xs">
               <thead><tr className="border-b border-white/6">
                 {['Day', 'Date', 'Hrs', 'Revs', 'Dist (NM)', 'HFO (MT)', 'FOE (MT)', 'Total FO', 'Speed (kn)', 'Guar. FO', 'Diff', 'Status', 'Weather', 'Slip %', 'Remarks', ''].map(h => (
@@ -198,7 +198,7 @@ export default function VoyageDetail() {
 
           {/* Passage Evaluation */}
           <div className="grid grid-cols-2 gap-6">
-            <div className="rounded-xl p-5 border border-white/5 space-y-3" style={{ background: 'rgba(15,23,42,0.6)' }}>
+            <div className="rounded-xl p-5 border border-white/5 space-y-3" style={{ background: 'var(--card-bg)' }}>
               <h3 className="text-sm font-semibold text-amber-300">Passage Data</h3>
               {[
                 ['Passage Duration (Days)', fmt(calc.passage_days)],
@@ -212,7 +212,7 @@ export default function VoyageDetail() {
               ))}
             </div>
 
-            <div className="rounded-xl p-5 border border-white/5 space-y-3" style={{ background: 'rgba(15,23,42,0.6)' }}>
+            <div className="rounded-xl p-5 border border-white/5 space-y-3" style={{ background: 'var(--card-bg)' }}>
               <h3 className="text-sm font-semibold text-amber-300">Exclusions</h3>
               {[
                 ['Harbour Period (Days)', fmt(calc.harbour_days, 3)],
@@ -229,7 +229,7 @@ export default function VoyageDetail() {
 
           {/* Net passage and evaluation */}
           <div className="grid grid-cols-2 gap-6">
-            <div className="rounded-xl p-5 border border-white/5 space-y-3" style={{ background: 'rgba(15,23,42,0.6)' }}>
+            <div className="rounded-xl p-5 border border-white/5 space-y-3" style={{ background: 'var(--card-bg)' }}>
               <h3 className="text-sm font-semibold text-amber-300">Net Passage (Less Exclusions)</h3>
               {[
                 ['Net Duration (Hrs)', fmt(calc.net_hours, 1)],
@@ -262,7 +262,7 @@ export default function VoyageDetail() {
           </div>
 
           {/* Simple comparison */}
-          <div className="rounded-xl p-5 border border-white/5 space-y-3" style={{ background: 'rgba(15,23,42,0.6)' }}>
+          <div className="rounded-xl p-5 border border-white/5 space-y-3" style={{ background: 'var(--card-bg)' }}>
             <h3 className="text-sm font-semibold text-amber-300">Simple Comparison (Actual vs Interpolated)</h3>
             <div className="grid grid-cols-3 gap-4">
               {[
@@ -296,7 +296,7 @@ export default function VoyageDetail() {
       {tab === 'foe' && calc && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-6">
-            <div className="rounded-xl p-5 border border-white/5 space-y-3" style={{ background: 'rgba(15,23,42,0.6)' }}>
+            <div className="rounded-xl p-5 border border-white/5 space-y-3" style={{ background: 'var(--card-bg)' }}>
               <h3 className="text-sm font-semibold text-amber-300">Guaranteed FOE</h3>
               {[
                 ['Vessel Capacity (M³)', fmt0(calc.vessel_capacity)],
@@ -310,7 +310,7 @@ export default function VoyageDetail() {
                 <div key={i} className="flex justify-between text-xs"><span className="text-slate-400">{l}</span><span className="font-mono text-slate-200">{v}</span></div>
               ))}
             </div>
-            <div className="rounded-xl p-5 border border-white/5 space-y-3" style={{ background: 'rgba(15,23,42,0.6)' }}>
+            <div className="rounded-xl p-5 border border-white/5 space-y-3" style={{ background: 'var(--card-bg)' }}>
               <h3 className="text-sm font-semibold text-amber-300">Actual FOE (Boil-Off)</h3>
               {[
                 ['Gauging After (M³)', fmt(calc.gauging_after_m3, 3)],
@@ -354,7 +354,7 @@ export default function VoyageDetail() {
               </div>
 
               {/* Rating Scale */}
-              <div className="rounded-xl p-5 border border-white/5" style={{ background: 'rgba(15,23,42,0.6)' }}>
+              <div className="rounded-xl p-5 border border-white/5" style={{ background: 'var(--card-bg)' }}>
                 <h3 className="text-sm font-semibold text-amber-300 mb-3">CII Rating Boundaries ({new Date().getFullYear()}, Reduction: {calc.cii_reduction_pct}%)</h3>
                 <div className="flex gap-1 h-8 rounded-lg overflow-hidden mb-3">
                   {[
@@ -393,7 +393,7 @@ export default function VoyageDetail() {
               </div>
 
               {/* Daily CII Table */}
-              <div className="rounded-xl border border-white/5 overflow-x-auto" style={{ background: 'rgba(15,23,42,0.6)' }}>
+              <div className="rounded-xl border border-white/5 overflow-x-auto" style={{ background: 'var(--card-bg)' }}>
                 <table className="w-full text-xs">
                   <thead><tr className="border-b border-white/6">
                     {['Day', 'Date', 'HFO (MT)', 'FOE (MT)', 'Dist (NM)', 'Daily CO₂', 'Daily CII', 'Cum CO₂', 'Cum Dist', 'Running CII', 'Rating'].map(h => (
