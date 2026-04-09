@@ -370,4 +370,156 @@ router.delete('/voyages/:voyage_number', authenticate, adminOnly, async (req, re
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── MONTHS list ───────────────────────────────────────────────────────────────
+router.get('/months', authenticate, lpgAccess, async (req, res) => {
+  try {
+    const { vessel_id } = req.query;
+    const params = []; const clauses = [];
+    if (vessel_id) { params.push(vessel_id); clauses.push(`vessel_id=$${params.length}`); }
+    const where = clauses.length ? 'WHERE '+clauses.join(' AND ') : '';
+    const { rows } = await pool.query(`
+      SELECT
+        TO_CHAR(record_date,'YYYY-MM')  AS month_key,
+        TO_CHAR(record_date,'Mon YYYY') AS month_label,
+        COUNT(*)::int                   AS record_count,
+        MIN(record_date)                AS start_date,
+        MAX(record_date)                AS end_date,
+        ROUND(SUM(COALESCE(sea_stm_hrs,0))::numeric,1)     AS sea_hrs,
+        ROUND(SUM(COALESCE(obs_dist,0))::numeric,1)        AS dist_nm,
+        ROUND(SUM(COALESCE(vlsfo_total_cons,0))::numeric,2) AS vlsfo_cons,
+        ROUND(SUM(COALESCE(lsmgo_cons_total,0))::numeric,2) AS lsmgo_cons,
+        ROUND(SUM(COALESCE(co2_emitted_mt,0))::numeric,2)   AS co2_mt,
+        MAX(vlsfo_rob)::float                                AS vlsfo_rob_eom,
+        MAX(lsmgo_rob)::float                                AS lsmgo_rob_eom,
+        ROUND(AVG(NULLIF(slip,0))::numeric,2)               AS avg_slip
+      FROM lpg_noon_logs ${where}
+      GROUP BY month_key, month_label
+      ORDER BY month_key DESC
+    `, params);
+    res.json(rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── MONTH detail (all records for YYYY-MM) ────────────────────────────────────
+router.get('/months/:month_key', authenticate, lpgAccess, async (req, res) => {
+  try {
+    const { vessel_id } = req.query;
+    const params = [req.params.month_key + '%'];
+    const clauses = ["TO_CHAR(record_date,'YYYY-MM') = $1"];
+    if (vessel_id) { params.push(vessel_id); clauses.push(`vessel_id=$${params.length}`); }
+    // fix: use correct comparison
+    params[0] = req.params.month_key;
+    clauses[0] = "TO_CHAR(record_date,'YYYY-MM') = $1";
+    const { rows } = await pool.query(
+      `SELECT * FROM lpg_noon_logs WHERE ${clauses.join(' AND ')} ORDER BY record_date ASC, record_time ASC`,
+      params
+    );
+    res.json(rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── ANALYTICS for dashboard ───────────────────────────────────────────────────
+router.get('/analytics', authenticate, lpgAccess, async (req, res) => {
+  try {
+    const { vessel_id } = req.query;
+    const params = []; const clauses = [];
+    if (vessel_id) { params.push(vessel_id); clauses.push(`vessel_id=$${params.length}`); }
+    const where = clauses.length ? 'WHERE '+clauses.join(' AND ') : '';
+
+    // Monthly aggregates for charts
+    const monthly = (await pool.query(`
+      SELECT
+        TO_CHAR(record_date,'YYYY-MM')  AS month_key,
+        TO_CHAR(record_date,'Mon YY')   AS month_label,
+        ROUND(AVG(NULLIF(slip,0))::numeric,2)              AS avg_slip,
+        ROUND(MAX(NULLIF(slip,0))::numeric,2)              AS max_slip,
+        ROUND(SUM(COALESCE(me_running_hrs,0))::numeric,1)  AS me_running_hrs,
+        ROUND(SUM(COALESCE(cyl_oil_cons,0))::numeric,1)    AS cyl_oil_cons,
+        ROUND(SUM(COALESCE(vlsfo_total_cons,0))::numeric,2) AS vlsfo_cons,
+        ROUND(SUM(COALESCE(lsmgo_cons_total,0))::numeric,2) AS lsmgo_cons,
+        ROUND(SUM(COALESCE(obs_dist,0))::numeric,1)         AS obs_dist,
+        ROUND(SUM(COALESCE(sea_stm_hrs,0))::numeric,1)      AS sea_hrs,
+        ROUND(SUM(COALESCE(co2_emitted_mt,0))::numeric,2)   AS co2_mt,
+        ROUND(AVG(NULLIF(ae_avg_kw,0))::numeric,0)          AS avg_ae_kw,
+        ROUND(SUM(COALESCE(rp_total_hrs,0))::numeric,1)     AS rp_hrs,
+        ROUND(SUM(COALESCE(fw_distilled_prod,0))::numeric,1) AS fw_produced,
+        COUNT(*)::int                                         AS records
+      FROM lpg_noon_logs ${where}
+      GROUP BY month_key, month_label
+      ORDER BY month_key ASC
+    `, params)).rows;
+
+    // Overall totals
+    const totals = (await pool.query(`
+      SELECT
+        SUM(obs_dist)::float         AS total_dist,
+        SUM(co2_emitted_mt)::float   AS total_co2,
+        SUM(vlsfo_total_cons)::float AS total_vlsfo,
+        SUM(lsmgo_cons_total)::float AS total_lsmgo,
+        SUM(sea_stm_hrs)::float      AS total_sea_hrs,
+        COUNT(*)::int                AS total_records,
+        MAX(vlsfo_rob)::float        AS latest_vlsfo_rob,
+        MAX(lsmgo_rob)::float        AS latest_lsmgo_rob,
+        MAX(record_date)             AS latest_date
+      FROM lpg_noon_logs ${where}
+    `, params)).rows[0];
+
+    // Anomaly detection
+    const anWhere = vessel_id ? 'WHERE vessel_id=$1 AND' : 'WHERE';
+    const anParams = vessel_id ? [vessel_id] : [];
+    const anomalies = (await pool.query(
+      `SELECT record_date, slip, vlsfo_total_cons, voyage_number, status
+       FROM lpg_noon_logs ${anWhere} (slip > 8 OR vlsfo_total_cons < 0 OR ulsfo_cons_me < -100)
+       ORDER BY record_date DESC LIMIT 20`,
+      anParams
+    )).rows;
+
+    // CII (LPG carrier, using Alfred Temile DWT=5400)
+    const dwt = 5400;
+    const year = new Date().getFullYear();
+    const Z = ({2023:5,2024:5,2025:7,2026:9,2027:11})[year] || 9;
+    const ciiRef = 1120 * Math.pow(dwt, -0.456);
+    const ciiReq = ciiRef * (1 - Z/100);
+    const d = [0.82,0.93,1.14,1.34];
+    const bounds = { A: ciiReq*d[0], B: ciiReq*d[1], C: ciiReq*d[2], D: ciiReq*d[3] };
+    const dist = parseFloat(totals.total_dist) || 0;
+    const co2  = parseFloat(totals.total_co2)  || 0;
+    const attained = dist > 0 ? (co2 * 1e6) / (dwt * dist) : 0;
+    const rating = attained<=bounds.A?'A':attained<=bounds.B?'B':attained<=bounds.C?'C':attained<=bounds.D?'D':'E';
+
+    res.json({ monthly, totals, cii: { ciiRef, ciiReq, bounds, attained, rating, dwt, Z }, anomalies });
+  } catch(e) { console.error('[LPG analytics]',e); res.status(500).json({ error: e.message }); }
+});
+
+// ── CREATE single noon record ─────────────────────────────────────────────────
+router.post('/noon', authenticate, lpgAccess, async (req, res) => {
+  try {
+    const r = req.body;
+    if (!r.vessel_id || !r.record_date) return res.status(400).json({ error: 'vessel_id and record_date required' });
+    const fields = Object.keys(r).filter(k => k !== 'id' && k !== 'created_at' && k !== 'imported_at');
+    const vals   = fields.map(f => r[f]);
+    const phs    = fields.map((_,i) => `$${i+1}`);
+    const { rows } = await pool.query(
+      `INSERT INTO lpg_noon_logs (${fields.join(',')}) VALUES (${phs.join(',')}) RETURNING *`, vals
+    );
+    res.json(rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── UPDATE single noon record ─────────────────────────────────────────────────
+router.put('/noon/:id', authenticate, lpgAccess, async (req, res) => {
+  try {
+    const r = req.body;
+    const fields = Object.keys(r).filter(k => !['id','created_at','imported_at','vessel_id'].includes(k));
+    const vals   = fields.map(f => r[f]);
+    vals.push(req.params.id);
+    const sets   = fields.map((f,i) => `${f}=$${i+1}`).join(',');
+    const { rows } = await pool.query(
+      `UPDATE lpg_noon_logs SET ${sets} WHERE id=$${vals.length} RETURNING *`, vals
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;
