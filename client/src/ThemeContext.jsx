@@ -58,12 +58,17 @@ export function ThemeProvider({ children }) {
     const t = themes[themeKey] || themes.dark;
 
     // CSS variables for direct style prop usage
-    document.documentElement.style.setProperty('--bg-main', t.bg);
-    document.documentElement.style.setProperty('--sidebar-bg', t.sidebar);
-    document.documentElement.style.setProperty('--card-bg', t.card);
-    document.documentElement.style.setProperty('--text-main', t.text);
-    document.documentElement.style.setProperty('--text-muted', t.textMuted);
-    document.documentElement.style.setProperty('--chart-label', t.chartLabel || '#94a3b8');
+    document.documentElement.style.setProperty('--bg-main',         t.bg);
+    document.documentElement.style.setProperty('--sidebar-bg',      t.sidebar);
+    document.documentElement.style.setProperty('--card-bg',         t.card);
+    document.documentElement.style.setProperty('--card-border',     t.cardBorder);
+    document.documentElement.style.setProperty('--table-head-bg',   t.table);
+    document.documentElement.style.setProperty('--table-row-bg',    t.tableRow);
+    document.documentElement.style.setProperty('--text-main',       t.text);
+    document.documentElement.style.setProperty('--text-muted',      t.textMuted);
+    document.documentElement.style.setProperty('--text-subtle',     t.textSubtle || t.textMuted);
+    document.documentElement.style.setProperty('--chart-label',     t.chartLabel || '#94a3b8');
+    document.documentElement.style.setProperty('--input-bg',        t.input);
     document.documentElement.setAttribute('data-theme', themeKey);
     document.body.style.color = t.text;
     document.body.style.background = t.bg;
@@ -87,14 +92,7 @@ export function ThemeProvider({ children }) {
       [data-theme="light"] nav .text-slate-600 { color: #334155 !important; }
     `;
 
-    const LIGHT_TABLE_VARS = `
-      /* Light theme: tables use white/near-white backgrounds */
-      [data-theme="light"] { 
-        --card-bg: rgba(255,255,255,0.95) !important;
-        --table-head-bg: rgba(241,245,249,0.98) !important;
-        --table-row-bg: rgba(248,250,252,0.6) !important;
-      }
-    `;
+    const LIGHT_TABLE_VARS = ``; // vars now set via setProperty for all themes
     const LIGHT_OVERRIDES = `
       /* ── LIGHT: all slate text classes → near-black for high contrast ── */
       [data-theme="light"] .text-slate-100 { color: #0f172a !important; }
