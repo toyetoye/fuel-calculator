@@ -10,6 +10,7 @@ import VesselManage from './pages/VesselManage';
 import UserManage from './pages/UserManage';
 import FuelPrices from './pages/FuelPrices';
 import { LPGDashboard, LPGHistory, LPGMonthDetail, LPGNoonForm, LPGImport } from './pages/LPGFuel';
+import { ThemeProvider, useTheme, ThemeSwitcher } from './ThemeContext';
 import LNGDashboard from './pages/LNGDashboard';
 
 const AuthContext = createContext(null);
@@ -49,13 +50,16 @@ function Sidebar() {
 
   return (
     <div className="w-56 min-h-screen flex flex-col border-r border-white/5 sticky top-0 h-screen overflow-y-auto" style={{ background: 'rgba(8,15,30,0.95)' }}>
-      <div className="p-5 border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg,#B45309,#D97706)' }}>FC</div>
-          <div>
-            <div className="text-sm font-bold text-slate-100">FORCAP</div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-widest">{user?.role}</div>
+      <div className="p-4 border-b border-white/5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg,#B45309,#D97706)' }}>FC</div>
+            <div>
+              <div className="text-sm font-bold text-slate-100">FORCAP</div>
+              <div className="text-[10px] text-slate-500 uppercase tracking-widest">{user?.role}</div>
+            </div>
           </div>
+          <ThemeSwitcher />
         </div>
       </div>
 
@@ -114,12 +118,13 @@ function Sidebar() {
   );
 }
 
-export default function App() {
+function AppInner() {
   const [user, setUser] = useState(api.getUser());
   const loc = useLocation();
+  const { theme } = useTheme();
   return (
     <AuthContext.Provider value={{ user, setUser }}>
-      <div className="flex min-h-screen font-sans text-slate-200" style={{ background: 'linear-gradient(180deg,#0B1120 0%,#0F172A 40%,#111827 100%)' }}>
+      <div className="flex min-h-screen font-sans text-slate-200" style={{ background: theme.bg }}>
         {user && loc.pathname !== '/login' && <Sidebar />}
         <div className="flex-1 overflow-auto">
           <Routes>
@@ -143,5 +148,13 @@ export default function App() {
         </div>
       </div>
     </AuthContext.Provider>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppInner />
+    </ThemeProvider>
   );
 }
