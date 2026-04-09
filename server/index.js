@@ -24,4 +24,5 @@ const dist = path.join(__dirname, '..', 'client', 'dist');
 app.use(express.static(dist));
 app.get('*', (req, res) => res.sendFile(path.join(dist, 'index.html')));
 
+console.log('[FORCAP] Server v1.1.0 — LPG months/analytics/noon routes active');
 initDB().then(() => app.listen(PORT, () => console.log(`Fuel Calculator running on port ${PORT}`))).catch(err => { console.error(err); process.exit(1); });
