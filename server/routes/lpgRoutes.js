@@ -326,7 +326,7 @@ router.post('/import/confirm', authenticate, adminOnly, upload.single('file'), a
         ${updateFields.map(f => `${f}=EXCLUDED.${f}`).join(',\n        ')}
     `;
 
-    let inserted=0, updated=0, errors=0;
+    let inserted=0, updated=0, errors=0, firstError=null;
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -336,13 +336,13 @@ router.post('/import/confirm', authenticate, adminOnly, upload.single('file'), a
         try {
           const r = await client.query(sql, vals);
           r.rowCount > 0 ? inserted++ : updated++;
-        } catch(e) { errors++; }
+        } catch(e) { errors++; if(!firstError) firstError = {row: parsed.indexOf(rec), msg: e.message, vals_sample: vals.slice(0,5)}; }
       }
       await client.query('COMMIT');
     } catch(e) { await client.query('ROLLBACK'); throw e; }
     finally { client.release(); }
 
-    res.json({ success:true, total:parsed.length, inserted, updated, errors });
+    res.json({ success:true, total:parsed.length, inserted, updated, errors, firstError });
   } catch(e) { console.error('[LPG confirm]',e); res.status(500).json({ error: e.message }); }
 });
 
