@@ -10,7 +10,7 @@ const fmt0 = v => (v==null||isNaN(v))?'—':Math.round(Number(v)).toLocaleString
 function StatCard({ label, value, sub, color='slate' }) {
   const cols = { amber:'text-amber-300', green:'text-green-300', blue:'text-blue-300', red:'text-red-300', teal:'text-teal-300', slate:'text-slate-100' };
   return (
-    <div className="rounded-lg p-4 border border-white/5" style={{background:'rgba(15,23,42,0.7)'}}>
+    <div className="rounded-lg p-4 border border-white/5" style={{background:'var(--card-bg)'}}>
       <div className="text-xs text-slate-500 mb-1">{label}</div>
       <div className={`text-xl font-bold ${cols[color]||cols.slate}`}>{value}</div>
       {sub && <div className="text-xs text-slate-500 mt-0.5">{sub}</div>}
@@ -114,7 +114,7 @@ function CIIBadge({ rating, attained, required }) {
   const colors = { A:'#059669',B:'#0891B2',C:'#D97706',D:'#EA580C',E:'#DC2626' };
   const col = colors[rating]||'#94A3B8';
   return (
-    <div className="flex flex-col items-center justify-center p-4 rounded-xl border border-white/5" style={{background:'rgba(15,23,42,0.7)'}}>
+    <div className="flex flex-col items-center justify-center p-4 rounded-xl border border-white/5" style={{background:'var(--card-bg)'}}>
       <div className="text-xs text-slate-500 mb-2">CII Rating (estimated)</div>
       <div className="text-6xl font-bold" style={{color:col}}>{rating||'—'}</div>
       <div className="text-xs text-slate-400 mt-2">Attained: <span style={{color:col}}>{fmt(attained,3)}</span></div>
@@ -217,7 +217,7 @@ export default function LNGDashboard() {
           {/* CII + Anomalies */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <CIIBadge rating={hasData ? cii.rating : '—'} attained={cii.attained} required={cii.ciiReq}/>
-            <div className="md:col-span-2 rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
+            <div className="md:col-span-2 rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-slate-200">Alerts & Anomalies</h3>
                 <span className={`px-2 py-0.5 text-xs rounded ${anomalies.length>0?'bg-amber-900/40 text-amber-300':'bg-green-900/40 text-green-300'}`}>
@@ -250,14 +250,14 @@ export default function LNGDashboard() {
 
           {/* Charts */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
+            <div className="rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
               <div className="mb-2">
                 <h3 className="text-sm font-semibold text-slate-200">HFO Consumption</h3>
                 <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Monthly total (MT)</p>
               </div>
               <BarChart data={monthly} yKey="hfo_consumed" color="#B45309" yUnit=" MT" tooltipLabel="HFO consumed"/>
             </div>
-            <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
+            <div className="rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
               <div className="mb-2">
                 <h3 className="text-sm font-semibold text-slate-200">Net Excess Fuel Trend</h3>
                 <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>vs charter party allowance (MT) — above 0 = chargeable</p>
@@ -267,14 +267,14 @@ export default function LNGDashboard() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
+            <div className="rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
               <div className="mb-2">
                 <h3 className="text-sm font-semibold text-slate-200">Distance Steamed</h3>
                 <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Monthly total (NM)</p>
               </div>
               <BarChart data={monthly} yKey="distance_nm" color="#0F766E" yUnit=" NM" tooltipLabel="Distance steamed"/>
             </div>
-            <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
+            <div className="rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
               <div className="mb-2">
                 <h3 className="text-sm font-semibold text-slate-200">Sea Steam Hours</h3>
                 <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Monthly total (hrs)</p>
@@ -285,14 +285,14 @@ export default function LNGDashboard() {
 
           {/* Monthly summary table */}
           {hasData && (
-            <div className="rounded-xl border border-white/5 overflow-hidden" style={{background:'rgba(8,15,30,0.8)'}}>
+            <div className="rounded-xl border border-white/5 overflow-hidden" style={{background:'var(--card-bg)'}}>
               <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-200">Monthly Summary</h3>
                 {selected===FLEET_KEY && <span className="text-xs text-slate-500">All vessels combined</span>}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
+                  <thead><tr style={{background:'var(--table-head-bg,rgba(15,23,42,0.9))'}}>
                     {['Month','Voyages','Sea Hrs','Distance NM','HFO (MT)','FOE (MT)','Att. CII','Net Excess','Status'].map(h=>(
                       <th key={h} className="px-3 py-2.5 text-left text-teal-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
                     ))}
@@ -302,7 +302,7 @@ export default function LNGDashboard() {
                       const excess=parseFloat(m.net_excess)||0;
                       return (
                         <tr key={m.month_key} className="border-t border-white/5 hover:bg-white/5"
-                          style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
+                          style={{background:i%2===0?'var(--table-row-bg,rgba(15,23,42,0.3))':'transparent'}}>
                           <td className="px-3 py-2 font-medium text-teal-300">{m.month_label}</td>
                           <td className="px-3 py-2 text-right text-slate-400">{m.voyage_count}</td>
                           <td className="px-3 py-2 text-right text-blue-300">{fmt(m.steaming_hrs,1)}</td>
@@ -330,7 +330,7 @@ export default function LNGDashboard() {
 
           {/* Empty state CTA */}
           {!hasData && (
-            <div className="rounded-xl border border-white/5 p-10 text-center" style={{background:'rgba(15,23,42,0.4)'}}>
+            <div className="rounded-xl border border-white/5 p-10 text-center" style={{background:'var(--table-row-bg,rgba(15,23,42,0.3))'}}>
               <div className="text-4xl mb-3">🚢</div>
               <div className="text-slate-300 font-semibold mb-2">
                 {selected === FLEET_KEY ? 'No voyage data in the system yet' : `No voyage data for ${selected}`}
