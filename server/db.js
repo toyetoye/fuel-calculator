@@ -130,6 +130,21 @@ const initDB = async () => {
     `);
     console.log('Fuel calculator tables initialized');
 
+    // ── Curve migration: seed Rivers Plus BALLAST from Rivers BALLAST if empty ──
+    const rpBallastCount = await client.query(
+      "SELECT COUNT(*) FROM interpolation_curves WHERE vessel_class='Rivers Plus' AND leg_type='BALLAST'"
+    );
+    if (parseInt(rpBallastCount.rows[0].count) === 0) {
+      await client.query(`
+        INSERT INTO interpolation_curves (vessel_class, leg_type, speed, fuel)
+        SELECT 'Rivers Plus', leg_type, speed, fuel
+        FROM interpolation_curves
+        WHERE vessel_class = 'Rivers' AND leg_type = 'BALLAST'
+        ON CONFLICT DO NOTHING
+      `);
+      console.log('[DB] Seeded Rivers Plus BALLAST curves from Rivers BALLAST');
+    }
+
     // Add columns if missing (for upgrades)
     const cols = [
       ['lng_vessels', 'dwt', 'DECIMAL(12,2) DEFAULT 0'],
