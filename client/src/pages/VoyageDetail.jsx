@@ -406,7 +406,7 @@ export default function VoyageDetail() {
                       return (
                         <tr key={i} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
                           <td className="px-3 py-2 font-mono text-amber-300">{r.day}</td>
-                          <td className="px-3 py-2 text-slate-400">{r.date ? new Date(r.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : ''}</td>
+                          <td className="px-3 py-2 text-slate-200">{r.date ? new Date(r.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : ''}</td>
                           <td className="px-3 py-2 font-mono text-right">{fmt(r.hfo, 1)}</td>
                           <td className="px-3 py-2 font-mono text-right">{fmt(r.foe)}</td>
                           <td className="px-3 py-2 font-mono text-right">{fmt0(r.dist)}</td>
