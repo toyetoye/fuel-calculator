@@ -55,16 +55,67 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => {
     localStorage.setItem('forcap_theme', themeKey);
-    // Apply CSS vars to root so legacy styles also pick up changes
     const t = themes[themeKey] || themes.dark;
+
+    // CSS variables for direct style prop usage
     document.documentElement.style.setProperty('--bg-main', t.bg);
     document.documentElement.style.setProperty('--sidebar-bg', t.sidebar);
     document.documentElement.style.setProperty('--card-bg', t.card);
     document.documentElement.style.setProperty('--text-main', t.text);
-    document.documentElement.style.setProperty('--text-muted', t.textMuted || t.textMuted);
+    document.documentElement.style.setProperty('--text-muted', t.textMuted);
     document.documentElement.style.setProperty('--chart-label', t.chartLabel || '#94a3b8');
-    // Apply to body so Tailwind text classes inherit where possible
+    document.documentElement.setAttribute('data-theme', themeKey);
     document.body.style.color = t.text;
+    document.body.style.background = t.bg;
+
+    // Inject comprehensive Tailwind override stylesheet
+    const styleId = 'forcap-theme-styles';
+    let el = document.getElementById(styleId);
+    if (!el) { el = document.createElement('style'); el.id = styleId; document.head.appendChild(el); }
+
+    const DARK_OVERRIDES = `
+      /* ── DARK / DIM: all slate text classes → near-white for high contrast ── */
+      [data-theme="dark"] .text-slate-100, [data-theme="dim"] .text-slate-100 { color: #f8fafc !important; }
+      [data-theme="dark"] .text-slate-200, [data-theme="dim"] .text-slate-200 { color: #f1f5f9 !important; }
+      [data-theme="dark"] .text-slate-300, [data-theme="dim"] .text-slate-300 { color: #e2e8f0 !important; }
+      [data-theme="dark"] .text-slate-400, [data-theme="dim"] .text-slate-400 { color: #cbd5e1 !important; }
+      [data-theme="dark"] .text-slate-500, [data-theme="dim"] .text-slate-500 { color: #94a3b8 !important; }
+      [data-theme="dark"] .text-slate-600, [data-theme="dim"] .text-slate-600 { color: #64748b !important; }
+      /* Sidebar always dark bg → always white text */
+      [data-theme="light"] nav .text-slate-400 { color: #1e293b !important; }
+      [data-theme="light"] nav .text-slate-500 { color: #334155 !important; }
+      [data-theme="light"] nav .text-slate-600 { color: #334155 !important; }
+    `;
+
+    const LIGHT_OVERRIDES = `
+      /* ── LIGHT: all slate text classes → near-black for high contrast ── */
+      [data-theme="light"] .text-slate-100 { color: #0f172a !important; }
+      [data-theme="light"] .text-slate-200 { color: #1e293b !important; }
+      [data-theme="light"] .text-slate-300 { color: #334155 !important; }
+      [data-theme="light"] .text-slate-400 { color: #475569 !important; }
+      [data-theme="light"] .text-slate-500 { color: #475569 !important; }
+      [data-theme="light"] .text-slate-600 { color: #334155 !important; }
+      /* Light theme: amber accents should stay visible */
+      [data-theme="light"] .text-amber-300 { color: #b45309 !important; }
+      [data-theme="light"] .text-amber-400 { color: #92400e !important; }
+      [data-theme="light"] .text-teal-300  { color: #0f766e !important; }
+      [data-theme="light"] .text-blue-300  { color: #1d4ed8 !important; }
+      [data-theme="light"] .text-red-300   { color: #dc2626 !important; }
+      [data-theme="light"] .text-green-300 { color: #15803d !important; }
+      [data-theme="light"] .text-green-400 { color: #15803d !important; }
+      [data-theme="light"] .text-purple-300 { color: #7e22ce !important; }
+      /* Light theme: card/table backgrounds → white */
+      [data-theme="light"] [class*="border-white"] { border-color: rgba(0,0,0,0.12) !important; }
+      [data-theme="light"] .hover\:bg-white\/5:hover { background: rgba(0,0,0,0.05) !important; }
+      /* Sidebar on light theme: ALWAYS dark bg with white text */
+      [data-theme="light"] nav,
+      [data-theme="light"] nav button { color: #e2e8f0 !important; }
+      [data-theme="light"] nav .text-amber-300 { color: #fbbf24 !important; }
+      /* Override monochrome/tracking labels in sidebar */
+      [data-theme="light"] nav .text-slate-600 { color: #94a3b8 !important; }
+    `;
+
+    el.textContent = DARK_OVERRIDES + LIGHT_OVERRIDES;
   }, [themeKey]);
 
   return (
