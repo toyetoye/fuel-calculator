@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../App';
 import api from '../api';
@@ -21,8 +21,26 @@ function StatCard({ label, value, sub, color='slate', onClick }) {
   );
 }
 
+// ─── Tooltip ─────────────────────────────────────────────────────────────────
+function Tooltip({ tip }) {
+  if (!tip) return null;
+  return (
+    <div style={{
+      position:'fixed', left:tip.x+12, top:tip.y-8, zIndex:9999,
+      background:'rgba(15,23,42,0.95)', border:'1px solid rgba(255,255,255,0.12)',
+      borderRadius:8, padding:'6px 10px', pointerEvents:'none',
+      boxShadow:'0 4px 16px rgba(0,0,0,0.4)', minWidth:120
+    }}>
+      <div style={{color:'#94a3b8', fontSize:10, marginBottom:2}}>{tip.label}</div>
+      <div style={{color:'#f1f5f9', fontSize:13, fontWeight:600}}>{tip.value}</div>
+      {tip.sub && <div style={{color:'#64748b', fontSize:10, marginTop:1}}>{tip.sub}</div>}
+    </div>
+  );
+}
+
 // ─── SVG Charts ──────────────────────────────────────────────────────────────
-function LineChart({ data, yKey, label, color='#3B82F6', warningLine, yUnit='' }) {
+function LineChart({ data, yKey, label, color='#3B82F6', warningLine, yUnit='', tooltipLabel }) {
+  const [tip, setTip] = useState(null);
   if (!data?.length) return <div className="text-slate-500 text-xs text-center py-8">No data</div>;
   const W=560,H=160,PL=42,PR=12,PT=12,PB=36;
   const cW=W-PL-PR, cH=H-PT-PB;
@@ -33,24 +51,36 @@ function LineChart({ data, yKey, label, color='#3B82F6', warningLine, yUnit='' }
   const path = vals.map((v,i)=>`${i===0?'M':'L'}${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(' ');
   const ticks = 4;
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:'visible'}}>
-      {Array.from({length:ticks+1},(_,i)=>i).map(i=>{
-        const v = (maxV/ticks)*i;
-        return <g key={i}>
-          <line x1={PL} y1={yp(v)} x2={W-PR} y2={yp(v)} stroke="rgba(255,255,255,0.04)" strokeWidth={1}/>
-          <text x={PL-4} y={yp(v)+4} fill="#475569" fontSize={9} textAnchor="end">{v.toFixed(v<10?1:0)}{yUnit}</text>
-        </g>;
-      })}
-      {warningLine && <><line x1={PL} y1={yp(warningLine)} x2={W-PR} y2={yp(warningLine)} stroke="#F59E0B" strokeWidth={1} strokeDasharray="4,2"/>
-        <text x={W-PR+2} y={yp(warningLine)+4} fill="#F59E0B" fontSize={8}>warn</text></>}
-      <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round"/>
-      {vals.map((v,i)=><circle key={i} cx={xp(i)} cy={yp(v)} r={3} fill={v>=(warningLine||Infinity)?'#EF4444':color}/>)}
-      {data.map((d,i)=>i%(Math.ceil(data.length/6))===0&&<text key={i} x={xp(i)} y={H-4} fill="#475569" fontSize={9} textAnchor="middle">{d.month_label}</text>)}
-    </svg>
+    <>
+      <Tooltip tip={tip}/>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:'visible', cursor:'crosshair'}}>
+        {Array.from({length:ticks+1},(_,i)=>i).map(i=>{
+          const v = (maxV/ticks)*i;
+          return <g key={i}>
+            <line x1={PL} y1={yp(v)} x2={W-PR} y2={yp(v)} stroke="rgba(255,255,255,0.04)" strokeWidth={1}/>
+            <text x={PL-4} y={yp(v)+4} fill="#475569" fontSize={9} textAnchor="end">{v.toFixed(v<10?1:0)}{yUnit}</text>
+          </g>;
+        })}
+        {warningLine && <><line x1={PL} y1={yp(warningLine)} x2={W-PR} y2={yp(warningLine)} stroke="#F59E0B" strokeWidth={1} strokeDasharray="4,2"/>
+          <text x={W-PR+2} y={yp(warningLine)+4} fill="#F59E0B" fontSize={8}>warn</text></>}
+        <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round"/>
+        {vals.map((v,i)=>(
+          <circle key={i} cx={xp(i)} cy={yp(v)} r={5}
+            fill={v>=(warningLine||Infinity)?'#EF4444':color}
+            stroke="rgba(0,0,0,0.4)" strokeWidth={1}
+            style={{cursor:'pointer'}}
+            onMouseEnter={e=>setTip({x:e.clientX, y:e.clientY, label:data[i].month_label, value:`${fmt(v,2)}${yUnit}`, sub: tooltipLabel})}
+            onMouseLeave={()=>setTip(null)}
+          />
+        ))}
+        {data.map((d,i)=>i%(Math.ceil(data.length/6))===0&&<text key={i} x={xp(i)} y={H-4} fill="#475569" fontSize={9} textAnchor="middle">{d.month_label}</text>)}
+      </svg>
+    </>
   );
 }
 
-function BarChart({ data, yKey, label, color='#B45309', yUnit='' }) {
+function BarChart({ data, yKey, label, color='#B45309', yUnit='', tooltipLabel }) {
+  const [tip, setTip] = useState(null);
   if (!data?.length) return <div className="text-slate-500 text-xs text-center py-8">No data</div>;
   const W=560,H=160,PL=42,PR=12,PT=12,PB=36;
   const cW=W-PL-PR, cH=H-PT-PB;
@@ -60,25 +90,32 @@ function BarChart({ data, yKey, label, color='#B45309', yUnit='' }) {
   const gap = cW/data.length;
   const ticks = 4;
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:'visible'}}>
-      {Array.from({length:ticks+1},(_,i)=>i).map(i=>{
-        const v=(maxV/ticks)*i;
-        return <g key={i}>
-          <line x1={PL} y1={PT+cH-(v/maxV)*cH} x2={W-PR} y2={PT+cH-(v/maxV)*cH} stroke="rgba(255,255,255,0.04)" strokeWidth={1}/>
-          <text x={PL-4} y={PT+cH-(v/maxV)*cH+4} fill="#475569" fontSize={9} textAnchor="end">{v.toFixed(v<10?1:0)}{yUnit}</text>
-        </g>;
-      })}
-      {vals.map((v,i)=>{
-        const x = PL + i*gap + (gap-bW)/2;
-        const bH = (v/maxV)*cH;
-        return <rect key={i} x={x} y={PT+cH-bH} width={bW} height={bH} fill={color} rx={2} opacity={0.85}/>;
-      })}
-      {data.map((d,i)=>i%(Math.ceil(data.length/6))===0&&<text key={i} x={PL+i*gap+gap/2} y={H-4} fill="#475569" fontSize={9} textAnchor="middle">{d.month_label}</text>)}
-    </svg>
+    <>
+      <Tooltip tip={tip}/>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:'visible'}}>
+        {Array.from({length:ticks+1},(_,i)=>i).map(i=>{
+          const v=(maxV/ticks)*i;
+          return <g key={i}>
+            <line x1={PL} y1={PT+cH-(v/maxV)*cH} x2={W-PR} y2={PT+cH-(v/maxV)*cH} stroke="rgba(255,255,255,0.04)" strokeWidth={1}/>
+            <text x={PL-4} y={PT+cH-(v/maxV)*cH+4} fill="#475569" fontSize={9} textAnchor="end">{v.toFixed(v<10?1:0)}{yUnit}</text>
+          </g>;
+        })}
+        {vals.map((v,i)=>{
+          const x = PL + i*gap + (gap-bW)/2;
+          const bH = (v/maxV)*cH;
+          return <rect key={i} x={x} y={PT+cH-bH} width={bW} height={bH} fill={color} rx={2} opacity={0.85}
+            style={{cursor:'pointer'}}
+            onMouseEnter={e=>setTip({x:e.clientX, y:e.clientY, label:data[i].month_label, value:`${fmt(v,2)}${yUnit}`, sub: tooltipLabel})}
+            onMouseLeave={()=>setTip(null)}
+          />;
+        })}
+        {data.map((d,i)=>i%(Math.ceil(data.length/6))===0&&<text key={i} x={PL+i*gap+gap/2} y={H-4} fill="#475569" fontSize={9} textAnchor="middle">{d.month_label}</text>)}
+      </svg>
+    </>
   );
 }
 
-function CIIBadge({ rating, attained, required }) {
+function CIIBadge({ rating, attained, required, context }) {
   const colors = { A:'#059669',B:'#0891B2',C:'#D97706',D:'#EA580C',E:'#DC2626' };
   const col = colors[rating]||'#94A3B8';
   return (
@@ -87,7 +124,7 @@ function CIIBadge({ rating, attained, required }) {
       <div className="text-6xl font-bold" style={{color:col}}>{rating}</div>
       <div className="text-xs text-slate-400 mt-2">Attained: <span style={{color:col}}>{fmt(attained,3)}</span></div>
       <div className="text-xs text-slate-500">Required: {fmt(required,3)}</div>
-      <div className="text-[10px] text-slate-600 mt-2 text-center px-2">IMO MEPC.339(76) — small coastal LPG carriers typically attain E under this framework</div>
+      {context && <div className="text-[10px] text-slate-600 mt-2 text-center px-2">{context}</div>}
       <div className="flex gap-1 mt-2">
         {['A','B','C','D','E'].map(l=>(
           <div key={l} className="px-2 py-0.5 rounded text-xs font-bold" style={{background:colors[l],color:'#fff',opacity:l===rating?1:0.3}}>{l}</div>
@@ -97,20 +134,38 @@ function CIIBadge({ rating, attained, required }) {
   );
 }
 
+// ─── Shared vessel selector ───────────────────────────────────────────────────
+function useVesselSelector(vessels, user) {
+  const isVesselUser = user?.role === 'vessel';
+  const [vesselId, setVesselId] = useState('');
+
+  useEffect(() => {
+    if (!vessels.length) return;
+    if (isVesselUser && user?.vessel_names?.length) {
+      // Auto-match vessel by name (case-insensitive)
+      const matched = vessels.find(v =>
+        user.vessel_names.some(n => n.toLowerCase().includes(v.name.toLowerCase().replace('lpg ','')) ||
+          v.name.toLowerCase().includes(n.toLowerCase().replace('lpg ','')))
+      );
+      if (matched) { setVesselId(String(matched.id)); return; }
+    }
+    if (!vesselId) setVesselId(String(vessels[0].id));
+  }, [vessels]);
+
+  return { vesselId, setVesselId, isVesselUser };
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export function LPGDashboard() {
   const nav = useNavigate();
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [vessels, setVessels] = useState([]);
-  const [vesselId, setVesselId] = useState('');
   const [loading, setLoading] = useState(true);
+  const { vesselId, setVesselId, isVesselUser } = useVesselSelector(vessels, user);
 
   useEffect(() => {
-    api.get('/api/lpg/vessels').then(r => {
-      setVessels(r);
-      if (r.length) setVesselId(String(r[0].id));
-    });
+    api.get('/api/lpg/vessels').then(r => setVessels(r));
   }, []);
 
   useEffect(() => {
@@ -130,17 +185,18 @@ export function LPGDashboard() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-100">LPG Dashboard</h1>
           <p className="text-sm text-slate-500 mt-0.5">Performance analytics — Alfred Temile</p>
         </div>
         <div className="flex gap-3 items-center">
-          <select value={vesselId} onChange={e=>setVesselId(e.target.value)}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/10 text-slate-200 text-sm">
-            {vessels.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
-          </select>
+          {!isVesselUser && (
+            <select value={vesselId} onChange={e=>setVesselId(e.target.value)}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/10 text-slate-200 text-sm">
+              {vessels.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+          )}
           {isAdmin && (
             <button onClick={()=>nav('/lpg/import')}
               className="px-4 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-600 text-white text-sm transition-colors">
@@ -150,7 +206,6 @@ export function LPGDashboard() {
         </div>
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label="Total Distance" value={`${fmt0(totals.total_dist)} NM`} color="blue"/>
         <StatCard label="Total VLSFO" value={`${fmt(totals.total_vlsfo)} MT`} color="amber"/>
@@ -158,9 +213,9 @@ export function LPGDashboard() {
         <StatCard label="Sea Hours" value={`${fmt(totals.total_sea_hrs,0)} hrs`}/>
       </div>
 
-      {/* CII + Alarms row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <CIIBadge rating={cii.rating} attained={cii.attained} required={cii.ciiReq}/>
+        <CIIBadge rating={cii.rating} attained={cii.attained} required={cii.ciiReq}
+          context="IMO MEPC.339(76) — small coastal LPG carriers typically attain E under this framework"/>
         <div className="md:col-span-2 rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-slate-200">Alerts & Anomalies</h3>
@@ -169,9 +224,7 @@ export function LPGDashboard() {
             </span>
           </div>
           {anomalies.length === 0 ? (
-            <div className="text-sm text-green-400 flex items-center gap-2">
-              <span>✓</span> No anomalies detected in the dataset
-            </div>
+            <div className="text-sm text-green-400 flex items-center gap-2"><span>✓</span> No anomalies detected</div>
           ) : (
             <div className="space-y-1.5 max-h-40 overflow-y-auto">
               {anomalies.map((a,i)=>(
@@ -181,7 +234,7 @@ export function LPGDashboard() {
                     <span className="text-slate-300 font-mono">{fmtD(a.record_date)}</span>
                     {a.anomaly_type === 'high_slip' && <span className="ml-2 text-amber-300">Slip {fmt(a.slip)}% (sea passage) — possible hull fouling</span>}
                     {a.anomaly_type === 'neg_fuel' && <span className="ml-2 text-red-300">Negative VLSFO total ({fmt(a.vlsfo_total_cons)} MT) — check entry</span>}
-                    {a.anomaly_type === 'flowmeter_anomaly' && <span className="ml-2 text-orange-300">Flow meter anomaly — ulsfo_cons_me = {fmt(a.ulsfo_cons_me)} MT</span>}
+                    {a.anomaly_type === 'flowmeter_anomaly' && <span className="ml-2 text-orange-300">Flow meter anomaly detected</span>}
                   </div>
                 </div>
               ))}
@@ -190,51 +243,42 @@ export function LPGDashboard() {
         </div>
       </div>
 
-      {/* Charts row 1: Slip + VLSFO */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
           <div className="mb-2">
             <h3 className="text-sm font-semibold text-slate-200">Propeller Slip Trend</h3>
-            <p className="text-xs text-slate-500">Monthly avg — dashed line = 6% hull fouling threshold</p>
+            <p className="text-xs text-slate-500">Monthly avg (sea passages only) — dashed = 6% hull fouling threshold</p>
           </div>
-          <LineChart data={monthly} yKey="avg_slip" color="#3B82F6" warningLine={6} yUnit="%"/>
+          <LineChart data={monthly} yKey="avg_slip" color="#3B82F6" warningLine={6} yUnit="%" tooltipLabel="Avg propeller slip"/>
         </div>
         <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
           <div className="mb-2">
             <h3 className="text-sm font-semibold text-slate-200">VLSFO Consumption</h3>
             <p className="text-xs text-slate-500">Monthly total (MT)</p>
           </div>
-          <BarChart data={monthly} yKey="vlsfo_cons" color="#B45309" yUnit=" MT"/>
+          <BarChart data={monthly} yKey="vlsfo_cons" color="#B45309" yUnit=" MT" tooltipLabel="VLSFO consumed"/>
         </div>
       </div>
 
-      {/* Charts row 2: Cyl Oil Rate + AE Load */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
           <div className="mb-2">
-            <h3 className="text-sm font-semibold text-slate-200">Cylinder Oil Consumption</h3>
-            <p className="text-xs text-slate-500">Monthly total vs ME running hours</p>
+            <h3 className="text-sm font-semibold text-slate-200">Cylinder Oil Consumption Rate</h3>
+            <p className="text-xs text-slate-500">L per ME running hour</p>
           </div>
-          {/* Dual axis approximation — use cylOil/MEhrs ratio */}
-          {monthly.length > 0 ? (
-            <div className="space-y-1">
-              <LineChart
-                data={monthly.map(m=>({...m, cyl_rate: m.me_running_hrs > 0 ? ((parseFloat(m.cyl_oil_cons)||0)/(parseFloat(m.me_running_hrs)||1)).toFixed(2) : 0}))}
-                yKey="cyl_rate" color="#10B981" yUnit=" L/hr"/>
-              <div className="text-xs text-slate-500 text-center">Cyl oil consumption rate (L per ME running hour)</div>
-            </div>
-          ) : <div className="text-xs text-slate-500 text-center py-8">No data</div>}
+          <LineChart
+            data={monthly.map(m=>({...m, cyl_rate: n0(m.me_running_hrs)>0 ? (n0(m.cyl_oil_cons)/n0(m.me_running_hrs)).toFixed(2) : 0}))}
+            yKey="cyl_rate" color="#10B981" yUnit=" L/hr" tooltipLabel="Cyl oil rate (L/ME hr)"/>
         </div>
         <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
           <div className="mb-2">
             <h3 className="text-sm font-semibold text-slate-200">Average AE Load</h3>
             <p className="text-xs text-slate-500">Monthly avg generator load (kW)</p>
           </div>
-          <LineChart data={monthly} yKey="avg_ae_kw" color="#A78BFA" yUnit=" kW"/>
+          <LineChart data={monthly} yKey="avg_ae_kw" color="#A78BFA" yUnit=" kW" tooltipLabel="Avg AE load"/>
         </div>
       </div>
 
-      {/* Monthly summary table */}
       <div className="rounded-xl border border-white/5 overflow-hidden" style={{background:'rgba(8,15,30,0.8)'}}>
         <div className="px-4 py-3 border-b border-white/5">
           <h3 className="text-sm font-semibold text-slate-200">Monthly Summary</h3>
@@ -277,16 +321,14 @@ export function LPGDashboard() {
 // ─── History (monthly list) ───────────────────────────────────────────────────
 export function LPGHistory() {
   const nav = useNavigate();
+  const { user } = useAuth();
   const [months, setMonths] = useState([]);
   const [vessels, setVessels] = useState([]);
-  const [vesselId, setVesselId] = useState('');
   const [loading, setLoading] = useState(true);
+  const { vesselId, setVesselId, isVesselUser } = useVesselSelector(vessels, user);
 
   useEffect(() => {
-    api.get('/api/lpg/vessels').then(r => {
-      setVessels(r);
-      if (r.length) setVesselId(String(r[0].id));
-    });
+    api.get('/api/lpg/vessels').then(r => setVessels(r));
   }, []);
 
   useEffect(() => {
@@ -305,10 +347,12 @@ export function LPGHistory() {
           <p className="text-sm text-slate-500 mt-0.5">Monthly noon log records</p>
         </div>
         <div className="flex gap-3 items-center">
-          <select value={vesselId} onChange={e=>setVesselId(e.target.value)}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/10 text-slate-200 text-sm">
-            {vessels.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
-          </select>
+          {!isVesselUser && (
+            <select value={vesselId} onChange={e=>setVesselId(e.target.value)}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/10 text-slate-200 text-sm">
+              {vessels.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+          )}
           <span className="text-sm text-slate-500">{months.length} months</span>
         </div>
       </div>
@@ -318,7 +362,7 @@ export function LPGHistory() {
       ) : months.length === 0 ? (
         <div className="text-center py-20 text-slate-500">
           <div className="text-4xl mb-3">📋</div>
-          <div>No records yet. Import a noon log or add a daily entry.</div>
+          <div>No records yet.</div>
         </div>
       ) : (
         <div className="rounded-xl border border-white/5 overflow-hidden" style={{background:'rgba(8,15,30,0.8)'}}>
@@ -356,7 +400,7 @@ export function LPGHistory() {
   );
 }
 
-// ─── Month Detail (5-tab, same structure as before) ───────────────────────────
+// ─── Month Detail (5-tab) ─────────────────────────────────────────────────────
 export function LPGMonthDetail() {
   const { month_key } = useParams();
   const location = useLocation();
@@ -364,7 +408,6 @@ export function LPGMonthDetail() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('overview');
-
   const vessel_id = new URLSearchParams(location.search).get('vessel_id') || '';
 
   useEffect(() => {
@@ -392,7 +435,6 @@ export function LPGMonthDetail() {
         {records[0] && <span className="text-slate-500 text-sm">{fmtD(records[0].record_date)} → {fmtD(last.record_date)}</span>}
       </div>
 
-      {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <StatCard label="Sea Hours"       value={fmt(sum('sea_stm_hrs'),1)} color="blue"/>
         <StatCard label="Distance NM"     value={fmt0(sum('obs_dist'))}/>
@@ -401,7 +443,6 @@ export function LPGMonthDetail() {
         <StatCard label="Total CO₂"       value={`${fmt(sum('co2_emitted_mt'))} MT`} color="red"/>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 mb-4 border-b border-white/5">
         {TABS.map(t=>(
           <button key={t} onClick={()=>setTab(t)}
@@ -413,151 +454,136 @@ export function LPGMonthDetail() {
 
       <div className="rounded-xl border border-white/5 overflow-x-auto" style={{background:'rgba(8,15,30,0.8)'}}>
         {tab==='overview' && (
-          <table className="w-full text-xs">
-            <thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
-              {['Date','Time','Mode','Status','Voyage','Sea Hrs','Anch','Manv','Tot Hrs','Dist NM','Obs Spd'].map(h=>(
-                <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>{records.map((r,i)=>(
-              <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
-                <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
-                <td className="px-3 py-2 text-slate-400">{r.record_time||'—'}</td>
-                <td className="px-3 py-2 text-slate-300">{r.mode||'—'}</td>
-                <td className="px-3 py-2 text-slate-400 max-w-xs truncate">{r.status||'—'}</td>
-                <td className="px-3 py-2 text-slate-400 font-mono">{r.voyage_number||'—'}</td>
-                <td className="px-3 py-2 text-right text-blue-300">{fmt(r.sea_stm_hrs,1)}</td>
-                <td className="px-3 py-2 text-right text-slate-400">{fmt(r.anch_drift_hrs,1)}</td>
-                <td className="px-3 py-2 text-right text-slate-400">{fmt(r.manv_hrs,1)}</td>
-                <td className="px-3 py-2 text-right text-slate-300">{fmt(r.total_hrs,1)}</td>
-                <td className="px-3 py-2 text-right text-slate-300">{fmt(r.obs_dist,1)}</td>
-                <td className="px-3 py-2 text-right text-slate-300">{fmt(r.obs_speed,2)}</td>
-              </tr>
-            ))}</tbody>
-          </table>
+          <table className="w-full text-xs"><thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
+            {['Date','Time','Mode','Status','Voyage','Sea Hrs','Anch','Manv','Tot Hrs','Dist NM','Obs Spd'].map(h=>(
+              <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
+            ))}
+          </tr></thead><tbody>{records.map((r,i)=>(
+            <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
+              <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
+              <td className="px-3 py-2 text-slate-400">{r.record_time||'—'}</td>
+              <td className="px-3 py-2 text-slate-300">{r.mode||'—'}</td>
+              <td className="px-3 py-2 text-slate-400 max-w-xs truncate">{r.status||'—'}</td>
+              <td className="px-3 py-2 text-slate-400 font-mono">{r.voyage_number||'—'}</td>
+              <td className="px-3 py-2 text-right text-blue-300">{fmt(r.sea_stm_hrs,1)}</td>
+              <td className="px-3 py-2 text-right text-slate-400">{fmt(r.anch_drift_hrs,1)}</td>
+              <td className="px-3 py-2 text-right text-slate-400">{fmt(r.manv_hrs,1)}</td>
+              <td className="px-3 py-2 text-right text-slate-300">{fmt(r.total_hrs,1)}</td>
+              <td className="px-3 py-2 text-right text-slate-300">{fmt(r.obs_dist,1)}</td>
+              <td className="px-3 py-2 text-right text-slate-300">{fmt(r.obs_speed,2)}</td>
+            </tr>
+          ))}</tbody></table>
         )}
         {tab==='fuel' && (
-          <table className="w-full text-xs">
-            <thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
-              {['Date','VLSFO ME','VLSFO AE','VLSFO Blr','VLSFO Total','VLSFO ROB','Bunkered','LSMGO ME','LSMGO AE','LSMGO Tot','LSMGO ROB','CO₂ MT'].map(h=>(
-                <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {records.map((r,i)=>(
-                <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
-                  <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
-                  <td className="px-3 py-2 text-right">{fmt(r.vlsfo_cons_me)}</td>
-                  <td className="px-3 py-2 text-right">{fmt(r.vlsfo_cons_ae)}</td>
-                  <td className="px-3 py-2 text-right">{fmt(r.vlsfo_cons_blr)}</td>
-                  <td className="px-3 py-2 text-right font-semibold text-amber-300">{fmt(r.vlsfo_total_cons)}</td>
-                  <td className="px-3 py-2 text-right text-blue-300">{fmt(r.vlsfo_rob)}</td>
-                  <td className="px-3 py-2 text-right text-green-300">{r.vlsfo_bunkered_qty>0?fmt(r.vlsfo_bunkered_qty):'—'}</td>
-                  <td className="px-3 py-2 text-right">{fmt(r.lsmgo_cons_me)}</td>
-                  <td className="px-3 py-2 text-right">{fmt(r.lsmgo_cons_ae_ig_incn)}</td>
-                  <td className="px-3 py-2 text-right">{fmt(r.lsmgo_cons_total)}</td>
-                  <td className="px-3 py-2 text-right text-blue-300">{fmt(r.lsmgo_rob)}</td>
-                  <td className="px-3 py-2 text-right text-red-300">{fmt(r.co2_emitted_mt)}</td>
-                </tr>
-              ))}
-              <tr className="border-t-2 border-amber-700/50 font-semibold" style={{background:'rgba(15,23,42,0.9)'}}>
-                <td className="px-3 py-2 text-amber-400">TOTALS</td>
-                {['vlsfo_cons_me','vlsfo_cons_ae','vlsfo_cons_blr','vlsfo_total_cons'].map(f=>(
-                  <td key={f} className="px-3 py-2 text-right text-amber-300">{fmt(sum(f))}</td>
-                ))}
-                <td className="px-3 py-2 text-right text-blue-300">{fmt(last.vlsfo_rob)}</td>
-                <td className="px-3 py-2 text-right text-green-300">{fmt(sum('vlsfo_bunkered_qty'))}</td>
-                {['lsmgo_cons_me','lsmgo_cons_ae_ig_incn','lsmgo_cons_total'].map(f=>(
-                  <td key={f} className="px-3 py-2 text-right text-amber-300">{fmt(sum(f))}</td>
-                ))}
-                <td className="px-3 py-2 text-right text-blue-300">{fmt(last.lsmgo_rob)}</td>
-                <td className="px-3 py-2 text-right text-red-300">{fmt(sum('co2_emitted_mt'))}</td>
+          <table className="w-full text-xs"><thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
+            {['Date','VLSFO ME','VLSFO AE','VLSFO Blr','VLSFO Total','VLSFO ROB','Bunkered','LSMGO ME','LSMGO AE','LSMGO Tot','LSMGO ROB','CO₂ MT'].map(h=>(
+              <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
+            ))}
+          </tr></thead><tbody>
+            {records.map((r,i)=>(
+              <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
+                <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
+                <td className="px-3 py-2 text-right">{fmt(r.vlsfo_cons_me)}</td>
+                <td className="px-3 py-2 text-right">{fmt(r.vlsfo_cons_ae)}</td>
+                <td className="px-3 py-2 text-right">{fmt(r.vlsfo_cons_blr)}</td>
+                <td className="px-3 py-2 text-right font-semibold text-amber-300">{fmt(r.vlsfo_total_cons)}</td>
+                <td className="px-3 py-2 text-right text-blue-300">{fmt(r.vlsfo_rob)}</td>
+                <td className="px-3 py-2 text-right text-green-300">{r.vlsfo_bunkered_qty>0?fmt(r.vlsfo_bunkered_qty):'—'}</td>
+                <td className="px-3 py-2 text-right">{fmt(r.lsmgo_cons_me)}</td>
+                <td className="px-3 py-2 text-right">{fmt(r.lsmgo_cons_ae_ig_incn)}</td>
+                <td className="px-3 py-2 text-right">{fmt(r.lsmgo_cons_total)}</td>
+                <td className="px-3 py-2 text-right text-blue-300">{fmt(r.lsmgo_rob)}</td>
+                <td className="px-3 py-2 text-right text-red-300">{fmt(r.co2_emitted_mt)}</td>
               </tr>
-            </tbody>
-          </table>
+            ))}
+            <tr className="border-t-2 border-amber-700/50 font-semibold" style={{background:'rgba(15,23,42,0.9)'}}>
+              <td className="px-3 py-2 text-amber-400">TOTALS</td>
+              {['vlsfo_cons_me','vlsfo_cons_ae','vlsfo_cons_blr','vlsfo_total_cons'].map(f=>(
+                <td key={f} className="px-3 py-2 text-right text-amber-300">{fmt(sum(f))}</td>
+              ))}
+              <td className="px-3 py-2 text-right text-blue-300">{fmt(last.vlsfo_rob)}</td>
+              <td className="px-3 py-2 text-right text-green-300">{fmt(sum('vlsfo_bunkered_qty'))}</td>
+              {['lsmgo_cons_me','lsmgo_cons_ae_ig_incn','lsmgo_cons_total'].map(f=>(
+                <td key={f} className="px-3 py-2 text-right text-amber-300">{fmt(sum(f))}</td>
+              ))}
+              <td className="px-3 py-2 text-right text-blue-300">{fmt(last.lsmgo_rob)}</td>
+              <td className="px-3 py-2 text-right text-red-300">{fmt(sum('co2_emitted_mt'))}</td>
+            </tr>
+          </tbody></table>
         )}
         {tab==='engine' && (
-          <table className="w-full text-xs">
-            <thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
-              {['Date','CTR','RPM','Eng Dist','Obs Spd','Obs Dist','Slip %','BHP','KW','FO Dens'].map(h=>(
-                <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>{records.map((r,i)=>(
-              <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
-                <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
-                <td className="px-3 py-2 text-right text-slate-400 font-mono">{fmt0(r.me_counter)}</td>
-                <td className="px-3 py-2 text-right text-slate-300">{fmt(r.me_rpm,1)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.engine_dist,1)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.obs_speed,2)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.obs_dist,1)}</td>
-                <td className="px-3 py-2 text-right" style={{color:parseFloat(r.slip)>6?'#EF4444':'#94a3b8'}}>{fmt(r.slip,2)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.me_bhp,0)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.me_kw,0)}</td>
-                <td className="px-3 py-2 text-right text-slate-400">{fmt(r.fo_density_15c,4)}</td>
-              </tr>
-            ))}</tbody>
-          </table>
+          <table className="w-full text-xs"><thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
+            {['Date','CTR','RPM','Eng Dist','Obs Spd','Obs Dist','Slip %','BHP','KW','FO Dens'].map(h=>(
+              <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
+            ))}
+          </tr></thead><tbody>{records.map((r,i)=>(
+            <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
+              <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
+              <td className="px-3 py-2 text-right text-slate-400 font-mono">{fmt0(r.me_counter)}</td>
+              <td className="px-3 py-2 text-right text-slate-300">{fmt(r.me_rpm,1)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.engine_dist,1)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.obs_speed,2)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.obs_dist,1)}</td>
+              <td className="px-3 py-2 text-right" style={{color:parseFloat(r.slip)>6?'#EF4444':'#94a3b8'}}>{fmt(r.slip,2)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.me_bhp,0)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.me_kw,0)}</td>
+              <td className="px-3 py-2 text-right text-slate-400">{fmt(r.fo_density_15c,4)}</td>
+            </tr>
+          ))}</tbody></table>
         )}
         {tab==='running hrs' && (
-          <table className="w-full text-xs">
-            <thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
-              {['Date','AE1 RHR','AE2 RHR','AE3 RHR','DG Total','AE Avg KW','Cargo Plant','RP1','RP2','RP3','RP Total','Cyl Oil L','Alexia70'].map(h=>(
-                <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>{records.map((r,i)=>(
-              <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
-                <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.ae1_rhr,1)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.ae2_rhr,1)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.ae3_rhr,1)}</td>
-                <td className="px-3 py-2 text-right text-blue-300">{fmt(r.ae_total_dg_rhr,1)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.ae_avg_kw,0)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.cargo_plant_rhr,1)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.rp1_rhr,1)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.rp2_rhr,1)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.rp3_rhr,1)}</td>
-                <td className="px-3 py-2 text-right text-amber-300">{fmt(r.rp_total_hrs,1)}</td>
-                <td className="px-3 py-2 text-right text-green-300">{fmt(r.cyl_oil_cons,1)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.cyl_alexia70_rob,0)}</td>
-              </tr>
-            ))}</tbody>
-          </table>
+          <table className="w-full text-xs"><thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
+            {['Date','AE1 RHR','AE2 RHR','AE3 RHR','DG Total','AE Avg KW','Cargo Plant','RP1','RP2','RP3','RP Total','Cyl Oil L','Alexia70'].map(h=>(
+              <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
+            ))}
+          </tr></thead><tbody>{records.map((r,i)=>(
+            <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
+              <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.ae1_rhr,1)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.ae2_rhr,1)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.ae3_rhr,1)}</td>
+              <td className="px-3 py-2 text-right text-blue-300">{fmt(r.ae_total_dg_rhr,1)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.ae_avg_kw,0)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.cargo_plant_rhr,1)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.rp1_rhr,1)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.rp2_rhr,1)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.rp3_rhr,1)}</td>
+              <td className="px-3 py-2 text-right text-amber-300">{fmt(r.rp_total_hrs,1)}</td>
+              <td className="px-3 py-2 text-right text-green-300">{fmt(r.cyl_oil_cons,1)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.cyl_alexia70_rob,0)}</td>
+            </tr>
+          ))}</tbody></table>
         )}
         {tab==='fresh water' && (
-          <table className="w-full text-xs">
-            <thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
-              {['Date','FWG Counter','Dist Prod','Dist Cons','Dom Prod','Dom Cons','Total ROB','Port Tk','Stbd Tk'].map(h=>(
-                <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>{records.map((r,i)=>(
-              <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
-                <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
-                <td className="px-3 py-2 text-right text-slate-400 font-mono">{fmt0(r.fw_fwg_counter)}</td>
-                <td className="px-3 py-2 text-right text-green-300">{fmt(r.fw_distilled_prod,1)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.fw_distilled_cons,1)}</td>
-                <td className="px-3 py-2 text-right text-green-300">{fmt(r.fw_dom_prod,1)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.fw_dom_cons,1)}</td>
-                <td className="px-3 py-2 text-right text-blue-300">{fmt(r.fw_total_rob,1)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.fw_port_tk,1)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.fw_stbd_tk,1)}</td>
-              </tr>
-            ))}</tbody>
-          </table>
+          <table className="w-full text-xs"><thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
+            {['Date','FWG Counter','Dist Prod','Dist Cons','Dom Prod','Dom Cons','Total ROB','Port Tk','Stbd Tk'].map(h=>(
+              <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
+            ))}
+          </tr></thead><tbody>{records.map((r,i)=>(
+            <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
+              <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
+              <td className="px-3 py-2 text-right text-slate-400 font-mono">{fmt0(r.fw_fwg_counter)}</td>
+              <td className="px-3 py-2 text-right text-green-300">{fmt(r.fw_distilled_prod,1)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.fw_distilled_cons,1)}</td>
+              <td className="px-3 py-2 text-right text-green-300">{fmt(r.fw_dom_prod,1)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.fw_dom_cons,1)}</td>
+              <td className="px-3 py-2 text-right text-blue-300">{fmt(r.fw_total_rob,1)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.fw_port_tk,1)}</td>
+              <td className="px-3 py-2 text-right">{fmt(r.fw_stbd_tk,1)}</td>
+            </tr>
+          ))}</tbody></table>
         )}
       </div>
     </div>
   );
 }
 
-// ─── Noon Form (daily entry) ──────────────────────────────────────────────────
-function Field({ label, name, value, onChange, type='number', step='any', required }) {
+// ─── Noon Form ────────────────────────────────────────────────────────────────
+function Field({ label, name, value, onChange, type='number', required }) {
   return (
     <div>
       <label className="block text-xs text-slate-400 mb-0.5">{label}{required&&<span className="text-red-400 ml-0.5">*</span>}</label>
-      <input type={type} name={name} value={value??''} step={step} onChange={onChange}
+      <input type={type} name={name} value={value??''} onChange={onChange}
         className="w-full px-2.5 py-1.5 rounded-lg bg-slate-800/80 border border-white/10 text-slate-200 text-sm focus:border-amber-600 focus:outline-none transition-colors"
         style={{appearance:'textfield'}}/>
     </div>
@@ -583,28 +609,24 @@ export function LPGNoonForm() {
   const { user } = useAuth();
   const [vessels, setVessels] = useState([]);
   const [form, setForm] = useState({
-    vessel_id: '',
-    record_date: new Date().toISOString().slice(0,10),
-    record_time: '1200',
-    mode: 'Noon',
-    status: '',
-    voyage_number: '',
-    berth_hrs: '', anch_drift_hrs: '', manv_hrs: '', sea_stm_hrs: '', total_hrs: '',
-    me_running_hrs: '', me_counter: '', me_revs: '', me_rpm: '',
-    engine_dist: '', obs_speed: '', obs_dist: '', dist_to_go: '', slip: '',
-    me_bhp: '', me_kw: '',
-    vlsfo_cons_me: '', vlsfo_cons_ae: '', vlsfo_cons_blr: '', vlsfo_total_cons: '', vlsfo_rob: '', vlsfo_bunkered_qty: '',
-    lsmgo_cons_me: '', lsmgo_cons_ae_ig_incn: '', lsmgo_cons_total: '', lsmgo_rob: '', lsmgo_bunkered_qty: '',
-    ae1_rhr: '', ae2_rhr: '', ae3_rhr: '', ae_total_dg_rhr: '', ae_avg_kw: '',
-    cargo_plant_rhr: '', rp1_rhr: '', rp2_rhr: '', rp3_rhr: '', rp_total_hrs: '',
-    cyl_oil_cons: '', cyl_alexia70_rob: '', cyl_melina30_rob: '',
-    aecc_ae1: '', aecc_ae2: '', aecc_ae3: '', aecc_rob: '',
-    fw_fwg_counter: '', fw_distilled_prod: '', fw_distilled_cons: '',
-    fw_dom_prod: '', fw_dom_cons: '', fw_total_rob: '', fw_port_tk: '', fw_stbd_tk: '',
+    vessel_id:'', record_date:new Date().toISOString().slice(0,10),
+    record_time:'1200', mode:'Noon', status:'', voyage_number:'',
+    berth_hrs:'', anch_drift_hrs:'', manv_hrs:'', sea_stm_hrs:'', total_hrs:'',
+    me_running_hrs:'', me_counter:'', me_revs:'', me_rpm:'',
+    engine_dist:'', obs_speed:'', obs_dist:'', dist_to_go:'', slip:'',
+    me_bhp:'', me_kw:'',
+    vlsfo_cons_me:'', vlsfo_cons_ae:'', vlsfo_cons_blr:'', vlsfo_total_cons:'', vlsfo_rob:'', vlsfo_bunkered_qty:'',
+    lsmgo_cons_me:'', lsmgo_cons_ae_ig_incn:'', lsmgo_cons_total:'', lsmgo_rob:'', lsmgo_bunkered_qty:'',
+    ae1_rhr:'', ae2_rhr:'', ae3_rhr:'', ae_total_dg_rhr:'', ae_avg_kw:'',
+    cargo_plant_rhr:'', rp1_rhr:'', rp2_rhr:'', rp3_rhr:'', rp_total_hrs:'',
+    cyl_oil_cons:'', cyl_alexia70_rob:'', cyl_melina30_rob:'',
+    fw_fwg_counter:'', fw_distilled_prod:'', fw_distilled_cons:'',
+    fw_dom_prod:'', fw_dom_cons:'', fw_total_rob:'', fw_port_tk:'', fw_stbd_tk:'',
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(null);
   const [error, setError] = useState('');
+  const { vesselId: autoVesselId, isVesselUser } = useVesselSelector(vessels, user);
 
   useEffect(() => {
     api.get('/api/lpg/vessels').then(r => {
@@ -613,37 +635,34 @@ export function LPGNoonForm() {
     });
   }, []);
 
+  useEffect(() => {
+    if (autoVesselId && isVesselUser) setForm(f => ({...f, vessel_id: autoVesselId}));
+  }, [autoVesselId]);
+
   const chg = e => {
     const { name, value } = e.target;
-    setForm(f => ({...f, [name]: value}));
-    // Auto-calculate total_hrs
-    if (['berth_hrs','anch_drift_hrs','manv_hrs','sea_stm_hrs'].includes(name)) {
-      setTimeout(() => {
-        setForm(f => {
-          const tot = (n0(name==='sea_stm_hrs'?value:f.sea_stm_hrs) + n0(name==='anch_drift_hrs'?value:f.anch_drift_hrs) +
-                      n0(name==='manv_hrs'?value:f.manv_hrs) + n0(name==='berth_hrs'?value:f.berth_hrs));
-          return {...f, [name]: value, total_hrs: tot > 0 ? tot.toFixed(1) : f.total_hrs};
-        });
-      }, 0);
-    }
+    setForm(f => {
+      const next = {...f, [name]: value};
+      if (['sea_stm_hrs','anch_drift_hrs','manv_hrs','berth_hrs'].includes(name)) {
+        const tot = n0(name==='sea_stm_hrs'?value:f.sea_stm_hrs) + n0(name==='anch_drift_hrs'?value:f.anch_drift_hrs) +
+                    n0(name==='manv_hrs'?value:f.manv_hrs) + n0(name==='berth_hrs'?value:f.berth_hrs);
+        if (tot > 0) next.total_hrs = tot.toFixed(1);
+      }
+      return next;
+    });
   };
 
   const handleSubmit = async () => {
     if (!form.vessel_id || !form.record_date) { setError('Vessel and date are required'); return; }
     setSaving(true); setError('');
-    // Clean empty strings to null
-    const payload = Object.fromEntries(
-      Object.entries(form).map(([k,v]) => [k, v===''?null:v])
-    );
+    const payload = Object.fromEntries(Object.entries(form).map(([k,v])=>[k,v===''?null:v]));
     try {
-      const result = await api.get('/api/lpg/vessels'); // warm check
       const res = await fetch('/api/lpg/noon', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer '+api.getToken() },
-        body: JSON.stringify(payload)
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+api.getToken()},
+        body:JSON.stringify(payload)
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Save failed');
+      if (!res.ok) throw new Error(data.error||'Save failed');
       setSaved(data);
     } catch(e) { setError(e.message); }
     setSaving(false);
@@ -653,12 +672,11 @@ export function LPGNoonForm() {
     <div className="p-6 max-w-2xl mx-auto text-center pt-20">
       <div className="text-4xl mb-3">✅</div>
       <div className="text-green-300 font-bold text-lg mb-2">Record saved</div>
-      <div className="text-slate-400 text-sm mb-6">{fmtD(saved.record_date)} — {saved.status || saved.mode}</div>
+      <div className="text-slate-400 text-sm mb-6">{fmtD(saved.record_date)} — {saved.status||saved.mode}</div>
       <div className="flex gap-3 justify-center">
         <button onClick={()=>{setSaved(null);setForm(f=>({...f,record_date:new Date().toISOString().slice(0,10),status:''}))}}
           className="px-5 py-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-white text-sm font-medium">Add Another</button>
-        <button onClick={()=>nav('/lpg/history')}
-          className="px-5 py-2 rounded-lg border border-white/10 text-slate-300 text-sm hover:bg-white/5">View History</button>
+        <button onClick={()=>nav('/lpg/history')} className="px-5 py-2 rounded-lg border border-white/10 text-slate-300 text-sm hover:bg-white/5">View History</button>
       </div>
     </div>
   );
@@ -669,18 +687,25 @@ export function LPGNoonForm() {
         <h1 className="text-2xl font-bold text-slate-100">Daily Noon Reading</h1>
       </div>
       {error && <div className="mb-4 p-3 rounded-lg bg-red-900/30 text-red-300 text-sm">{error}</div>}
-
       <div className="space-y-4">
-        {/* Vessel + Date */}
         <div className="rounded-xl border border-amber-700/30 p-5" style={{background:'rgba(15,23,42,0.9)'}}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-xs text-slate-400 mb-0.5">Vessel<span className="text-red-400 ml-0.5">*</span></label>
-              <select name="vessel_id" value={form.vessel_id} onChange={chg}
-                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-800 border border-white/10 text-slate-200 text-sm">
-                {vessels.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
-              </select>
-            </div>
+            {!isVesselUser ? (
+              <div>
+                <label className="block text-xs text-slate-400 mb-0.5">Vessel<span className="text-red-400 ml-0.5">*</span></label>
+                <select name="vessel_id" value={form.vessel_id} onChange={chg}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-800 border border-white/10 text-slate-200 text-sm">
+                  {vessels.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs text-slate-400 mb-0.5">Vessel</label>
+                <div className="px-2.5 py-1.5 rounded-lg bg-slate-800/50 border border-white/5 text-slate-300 text-sm">
+                  {vessels.find(v=>String(v.id)===String(form.vessel_id))?.name || '—'}
+                </div>
+              </div>
+            )}
             <Field label="Date *"   name="record_date"  value={form.record_date}  onChange={chg} type="date" required/>
             <Field label="Time"     name="record_time"  value={form.record_time}  onChange={chg} type="text"/>
             <Field label="Mode"     name="mode"         value={form.mode}         onChange={chg} type="text"/>
@@ -690,15 +715,13 @@ export function LPGNoonForm() {
             <Field label="Voyage Ref" name="voyage_number" value={form.voyage_number} onChange={chg} type="text"/>
           </div>
         </div>
-
         <Section title="Hours Breakdown">
-          <Field label="Sea Steam Hrs"   name="sea_stm_hrs"    value={form.sea_stm_hrs}    onChange={chg}/>
+          <Field label="Sea Steam Hrs"    name="sea_stm_hrs"    value={form.sea_stm_hrs}    onChange={chg}/>
           <Field label="Anchor/Drift Hrs" name="anch_drift_hrs" value={form.anch_drift_hrs} onChange={chg}/>
           <Field label="Manoeuvring Hrs"  name="manv_hrs"       value={form.manv_hrs}        onChange={chg}/>
           <Field label="Berth Hrs"        name="berth_hrs"      value={form.berth_hrs}        onChange={chg}/>
           <Field label="Total Hrs"        name="total_hrs"      value={form.total_hrs}        onChange={chg}/>
         </Section>
-
         <Section title="Main Engine & Navigation">
           <Field label="ME Counter (CTR)" name="me_counter"  value={form.me_counter}  onChange={chg}/>
           <Field label="Revolutions"       name="me_revs"     value={form.me_revs}     onChange={chg}/>
@@ -712,7 +735,6 @@ export function LPGNoonForm() {
           <Field label="KW"                name="me_kw"       value={form.me_kw}       onChange={chg}/>
           <Field label="ME Running Hrs"    name="me_running_hrs" value={form.me_running_hrs} onChange={chg}/>
         </Section>
-
         <Section title="Fuel — VLSFO">
           <Field label="ME Cons (MT)"     name="vlsfo_cons_me"    value={form.vlsfo_cons_me}    onChange={chg}/>
           <Field label="AE Cons (MT)"     name="vlsfo_cons_ae"    value={form.vlsfo_cons_ae}    onChange={chg}/>
@@ -721,7 +743,6 @@ export function LPGNoonForm() {
           <Field label="ROB (MT)"         name="vlsfo_rob"        value={form.vlsfo_rob}        onChange={chg}/>
           <Field label="Bunkered (MT)"    name="vlsfo_bunkered_qty" value={form.vlsfo_bunkered_qty} onChange={chg}/>
         </Section>
-
         <Section title="Fuel — LSMGO" defaultOpen={false}>
           <Field label="ME (MT)"         name="lsmgo_cons_me"        value={form.lsmgo_cons_me}        onChange={chg}/>
           <Field label="AE/IG/INCN (MT)" name="lsmgo_cons_ae_ig_incn" value={form.lsmgo_cons_ae_ig_incn} onChange={chg}/>
@@ -729,7 +750,6 @@ export function LPGNoonForm() {
           <Field label="ROB (MT)"        name="lsmgo_rob"            value={form.lsmgo_rob}            onChange={chg}/>
           <Field label="Bunkered (MT)"   name="lsmgo_bunkered_qty"   value={form.lsmgo_bunkered_qty}   onChange={chg}/>
         </Section>
-
         <Section title="Running Hours" defaultOpen={false}>
           <Field label="AE No.1 RHR" name="ae1_rhr"       value={form.ae1_rhr}       onChange={chg}/>
           <Field label="AE No.2 RHR" name="ae2_rhr"       value={form.ae2_rhr}       onChange={chg}/>
@@ -742,17 +762,11 @@ export function LPGNoonForm() {
           <Field label="RP3 Hrs" name="rp3_rhr" value={form.rp3_rhr} onChange={chg}/>
           <Field label="RP Total Hrs" name="rp_total_hrs" value={form.rp_total_hrs} onChange={chg}/>
         </Section>
-
         <Section title="Cylinder & Lube Oil" defaultOpen={false}>
           <Field label="Cyl Oil Consumption (L)" name="cyl_oil_cons"   value={form.cyl_oil_cons}   onChange={chg}/>
           <Field label="Alexia 70 ROB (L)"        name="cyl_alexia70_rob" value={form.cyl_alexia70_rob} onChange={chg}/>
           <Field label="Melina 30 ROB (L)"        name="cyl_melina30_rob" value={form.cyl_melina30_rob} onChange={chg}/>
-          <Field label="AECC AE1 (L)"  name="aecc_ae1" value={form.aecc_ae1} onChange={chg}/>
-          <Field label="AECC AE2 (L)"  name="aecc_ae2" value={form.aecc_ae2} onChange={chg}/>
-          <Field label="AECC AE3 (L)"  name="aecc_ae3" value={form.aecc_ae3} onChange={chg}/>
-          <Field label="AECC ROB (L)"  name="aecc_rob" value={form.aecc_rob} onChange={chg}/>
         </Section>
-
         <Section title="Fresh Water" defaultOpen={false}>
           <Field label="FWG Counter"      name="fw_fwg_counter"   value={form.fw_fwg_counter}   onChange={chg}/>
           <Field label="Distilled Prod (T)" name="fw_distilled_prod" value={form.fw_distilled_prod} onChange={chg}/>
@@ -763,22 +777,18 @@ export function LPGNoonForm() {
           <Field label="Stbd Tank (T)"      name="fw_stbd_tk"       value={form.fw_stbd_tk}       onChange={chg}/>
         </Section>
       </div>
-
       <div className="flex gap-3 mt-6">
-        <button onClick={()=>nav('/lpg')}
-          className="px-5 py-2.5 rounded-lg border border-white/10 text-slate-300 text-sm hover:bg-white/5 transition-colors">
-          Cancel
-        </button>
+        <button onClick={()=>nav('/lpg')} className="px-5 py-2.5 rounded-lg border border-white/10 text-slate-300 text-sm hover:bg-white/5 transition-colors">Cancel</button>
         <button onClick={handleSubmit} disabled={saving}
           className="flex-1 px-5 py-2.5 rounded-lg bg-amber-700 hover:bg-amber-600 text-white text-sm font-semibold transition-colors disabled:opacity-50">
-          {saving ? 'Saving…' : 'Save Noon Record'}
+          {saving?'Saving…':'Save Noon Record'}
         </button>
       </div>
     </div>
   );
 }
 
-// ─── Import (unchanged, keep working) ────────────────────────────────────────
+// ─── Import ───────────────────────────────────────────────────────────────────
 export function LPGImport() {
   const nav = useNavigate();
   const fileRef = useRef();
@@ -837,7 +847,6 @@ export function LPGImport() {
       {step==='preview' && preview && (
         <div className="space-y-4">
           <div className="rounded-xl border border-white/5 p-5" style={{background:'rgba(8,15,30,0.8)'}}>
-            <h2 className="font-semibold text-slate-200 mb-3">Import Summary</h2>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><span className="text-slate-500">Records found</span><div className="text-amber-300 font-bold text-lg">{preview.total}</div></div>
               <div><span className="text-slate-500">Voyages</span><div className="text-slate-200 font-bold text-lg">{preview.voyages?.length||0}</div></div>
