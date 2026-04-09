@@ -39,7 +39,7 @@ export default function VoyageList() {
 
       <div className="grid grid-cols-3 gap-4 mb-2">
         {[{ l: 'Total Voyages', v: voyages.length, c: '#FBBF24' }, { l: 'Draft', v: voyages.filter(v => v.status === 'draft').length, c: '#F59E0B' }, { l: 'Finalised', v: voyages.filter(v => v.status === 'finalised').length, c: '#34D399' }].map((k, i) => (
-          <div key={i} className="rounded-xl p-4 border border-white/5" style={{ background: 'rgba(15,23,42,0.6)' }}>
+          <div key={i} className="rounded-xl p-4 border border-white/5" style={{ background: 'var(--card-bg)' }}>
             <div className="text-xs text-slate-500 uppercase">{k.l}</div>
             <div className="text-2xl font-bold mt-1" style={{ color: k.c }}>{k.v}</div>
           </div>
@@ -48,7 +48,7 @@ export default function VoyageList() {
 
       <div className="space-y-3">
         {filtered.map(v => (
-          <div key={v.id} onClick={() => nav(`/voyages/${v.id}`)} className="rounded-xl p-5 border border-white/5 hover:border-amber-800/30 cursor-pointer transition-all" style={{ background: 'rgba(15,23,42,0.6)' }}>
+          <div key={v.id} onClick={() => nav(`/voyages/${v.id}`)} className="rounded-xl p-5 border border-white/5 hover:border-amber-800/30 cursor-pointer transition-all" style={{ background: 'var(--card-bg)' }}>
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-3">
