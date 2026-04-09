@@ -143,7 +143,15 @@ function AppInner() {
             <Route path="/vessels"           element={<ProtectedRoute><VesselManage /></ProtectedRoute>} />
             <Route path="/fuel-prices"       element={<ProtectedRoute><FuelPrices /></ProtectedRoute>} />
             <Route path="/users"             element={<ProtectedRoute><UserManage /></ProtectedRoute>} />
-            <Route path="*"                  element={<Navigate to={user ? '/lpg' : '/login'} />} />
+            <Route path="*"                  element={<Navigate to={(() => {
+              if (!user) return '/login';
+              const vn = user.vessel_names || [];
+              const hasLpg = vn.some(v => v.toLowerCase().includes('alfred temile'));
+              const hasLng = vn.some(v => !v.toLowerCase().includes('alfred temile')) ||
+                             ['admin','manager','superintendent'].includes(user.role);
+              if (hasLpg && !hasLng) return '/lpg';
+              return '/lng/dashboard';
+            })()} />} />
           </Routes>
         </div>
       </div>
