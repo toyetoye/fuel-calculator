@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../App';
 import api from '../api';
+import { HelpButton } from '../HelpModal';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 const fmt   = (v,d=2) => (v==null||isNaN(v)||v==='')?'—':Number(v).toFixed(d);
@@ -191,6 +192,7 @@ export function LPGDashboard() {
           <p className="text-sm text-slate-500 mt-0.5">Performance analytics — Alfred Temile</p>
         </div>
         <div className="flex gap-3 items-center">
+          <HelpButton type="lpg" />
           {!isVesselUser && (
             <select value={vesselId} onChange={e=>setVesselId(e.target.value)}
               className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/10 text-slate-200 text-sm">
