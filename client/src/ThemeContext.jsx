@@ -11,8 +11,10 @@ export const themes = {
     cardBorder:'rgba(255,255,255,0.05)',
     table:     'rgba(8,15,30,0.8)',
     tableRow:  'rgba(15,23,42,0.4)',
-    text:      '#cbd5e1',
-    textMuted: '#475569',
+    text:        '#f1f5f9',   // slate-100 — high contrast on dark bg
+    textMuted:   '#94a3b8',   // slate-400 — readable secondary text
+    textSubtle:  '#64748b',   // slate-500 — chart labels
+    chartLabel:  '#94a3b8',   // specific override for SVG chart axis labels
     input:     '#1e293b',
   },
   dim: {
@@ -24,8 +26,10 @@ export const themes = {
     cardBorder:'rgba(255,255,255,0.08)',
     table:     'rgba(15,25,40,0.9)',
     tableRow:  'rgba(22,34,52,0.6)',
-    text:      '#e2e8f0',
-    textMuted: '#64748b',
+    text:        '#f8fafc',   // slate-50 — near-white, high contrast
+    textMuted:   '#94a3b8',   // slate-400 — readable secondary text
+    textSubtle:  '#64748b',   // slate-500
+    chartLabel:  '#94a3b8',   // chart axis labels
     input:     '#1e3048',
   },
   light: {
@@ -57,7 +61,10 @@ export function ThemeProvider({ children }) {
     document.documentElement.style.setProperty('--sidebar-bg', t.sidebar);
     document.documentElement.style.setProperty('--card-bg', t.card);
     document.documentElement.style.setProperty('--text-main', t.text);
-    document.documentElement.style.setProperty('--text-muted', t.textMuted);
+    document.documentElement.style.setProperty('--text-muted', t.textMuted || t.textMuted);
+    document.documentElement.style.setProperty('--chart-label', t.chartLabel || '#94a3b8');
+    // Apply to body so Tailwind text classes inherit where possible
+    document.body.style.color = t.text;
   }, [themeKey]);
 
   return (
