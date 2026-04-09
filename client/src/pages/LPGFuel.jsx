@@ -14,7 +14,7 @@ function StatCard({ label, value, sub, color='slate', onClick }) {
   const cols = { amber:'text-amber-300', green:'text-green-300', blue:'text-blue-300', red:'text-red-300', slate:'text-slate-100' };
   return (
     <div onClick={onClick} className={`rounded-lg p-4 border border-white/5 ${onClick?'cursor-pointer hover:border-amber-700/40':''}`}
-      style={{background:'rgba(15,23,42,0.7)'}}>
+      style={{background:'var(--card-bg)'}}>
       <div className="text-xs text-slate-500 mb-1">{label}</div>
       <div className={`text-xl font-bold ${cols[color]||cols.slate}`}>{value}</div>
       {sub && <div className="text-xs text-slate-500 mt-0.5">{sub}</div>}
@@ -120,7 +120,7 @@ function CIIBadge({ rating, attained, required, context }) {
   const colors = { A:'#059669',B:'#0891B2',C:'#D97706',D:'#EA580C',E:'#DC2626' };
   const col = colors[rating]||'#94A3B8';
   return (
-    <div className="flex flex-col items-center justify-center p-4 rounded-xl border border-white/5" style={{background:'rgba(15,23,42,0.7)'}}>
+    <div className="flex flex-col items-center justify-center p-4 rounded-xl border border-white/5" style={{background:'var(--card-bg)'}}>
       <div className="text-xs text-slate-500 mb-2">CII Rating (estimated)</div>
       <div className="text-6xl font-bold" style={{color:col}}>{rating}</div>
       <div className="text-xs text-slate-400 mt-2">Attained: <span style={{color:col}}>{fmt(attained,3)}</span></div>
@@ -218,7 +218,7 @@ export function LPGDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <CIIBadge rating={cii.rating} attained={cii.attained} required={cii.ciiReq}
           context="IMO MEPC.339(76) — small coastal LPG carriers typically attain E under this framework"/>
-        <div className="md:col-span-2 rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
+        <div className="md:col-span-2 rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-slate-200">Alerts & Anomalies</h3>
             <span className={`px-2 py-0.5 text-xs rounded ${anomalies.length > 0 ? 'bg-red-900/40 text-red-300' : 'bg-green-900/40 text-green-300'}`}>
@@ -246,14 +246,14 @@ export function LPGDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
+        <div className="rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
           <div className="mb-2">
             <h3 className="text-sm font-semibold text-slate-200">Propeller Slip Trend</h3>
             <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Monthly avg (sea passages only) — dashed = 6% hull fouling threshold</p>
           </div>
           <LineChart data={monthly} yKey="avg_slip" color="#3B82F6" warningLine={6} yUnit="%" tooltipLabel="Avg propeller slip"/>
         </div>
-        <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
+        <div className="rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
           <div className="mb-2">
             <h3 className="text-sm font-semibold text-slate-200">VLSFO Consumption</h3>
             <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Monthly total (MT)</p>
@@ -263,7 +263,7 @@ export function LPGDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
+        <div className="rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
           <div className="mb-2">
             <h3 className="text-sm font-semibold text-slate-200">Cylinder Oil Consumption Rate</h3>
             <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>L per ME running hour</p>
@@ -272,7 +272,7 @@ export function LPGDashboard() {
             data={monthly.map(m=>({...m, cyl_rate: n0(m.me_running_hrs)>0 ? (n0(m.cyl_oil_cons)/n0(m.me_running_hrs)).toFixed(2) : 0}))}
             yKey="cyl_rate" color="#10B981" yUnit=" L/hr" tooltipLabel="Cyl oil rate (L/ME hr)"/>
         </div>
-        <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
+        <div className="rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
           <div className="mb-2">
             <h3 className="text-sm font-semibold text-slate-200">Average AE Load</h3>
             <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Monthly avg generator load (kW)</p>
@@ -281,14 +281,14 @@ export function LPGDashboard() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-white/5 overflow-hidden" style={{background:'rgba(8,15,30,0.8)'}}>
+      <div className="rounded-xl border border-white/5 overflow-hidden" style={{background:'var(--card-bg)'}}>
         <div className="px-4 py-3 border-b border-white/5">
           <h3 className="text-sm font-semibold text-slate-200">Monthly Summary</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr style={{background:'rgba(15,23,42,0.9)'}}>
+              <tr style={{background:'var(--table-head-bg,rgba(15,23,42,0.9))'}}>
                 {['Month','Records','Sea Hrs','Dist NM','VLSFO MT','LSMGO MT','CO₂ MT','Avg Slip %','Cyl Oil L','ME Hrs','Cargo Plant Hrs'].map(h=>(
                   <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
                 ))}
@@ -298,7 +298,7 @@ export function LPGDashboard() {
               {monthly.slice().reverse().map((m,i)=>(
                 <tr key={m.month_key} onClick={()=>nav(`/lpg/history/${m.month_key}?vessel_id=${vesselId}`)}
                   className="border-t border-white/5 hover:bg-white/5 cursor-pointer"
-                  style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
+                  style={{background:i%2===0?'var(--table-row-bg,rgba(15,23,42,0.3))':'transparent'}}>
                   <td className="px-3 py-2 font-medium text-amber-300">{m.month_label}</td>
                   <td className="px-3 py-2 text-right text-slate-400">{m.records}</td>
                   <td className="px-3 py-2 text-right text-blue-300">{fmt(m.sea_hrs,1)}</td>
@@ -367,10 +367,10 @@ export function LPGHistory() {
           <div>No records yet.</div>
         </div>
       ) : (
-        <div className="rounded-xl border border-white/5 overflow-hidden" style={{background:'rgba(8,15,30,0.8)'}}>
+        <div className="rounded-xl border border-white/5 overflow-hidden" style={{background:'var(--card-bg)'}}>
           <table className="w-full text-sm">
             <thead>
-              <tr style={{background:'rgba(15,23,42,0.9)'}}>
+              <tr style={{background:'var(--table-head-bg,rgba(15,23,42,0.9))'}}>
                 {['Month','Period','Records','Sea Hrs','Distance NM','VLSFO (MT)','LSMGO (MT)','CO₂ (MT)','Avg Slip %','VLSFO ROB'].map(h=>(
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-amber-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
@@ -381,7 +381,7 @@ export function LPGHistory() {
                 <tr key={m.month_key}
                   onClick={()=>nav(`/lpg/history/${m.month_key}?vessel_id=${vesselId}`)}
                   className="border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
-                  style={{background:i%2===0?'rgba(15,23,42,0.4)':'transparent'}}>
+                  style={{background:i%2===0?'var(--table-row-bg,rgba(15,23,42,0.3))':'transparent'}}>
                   <td className="px-4 py-3 font-semibold text-amber-300">{m.month_label}</td>
                   <td className="px-4 py-3 text-slate-400 text-xs">{fmtD(m.start_date)} → {fmtD(m.end_date)}</td>
                   <td className="px-4 py-3 text-right text-slate-300">{m.record_count}</td>
@@ -454,14 +454,14 @@ export function LPGMonthDetail() {
         ))}
       </div>
 
-      <div className="rounded-xl border border-white/5 overflow-x-auto" style={{background:'rgba(8,15,30,0.8)'}}>
+      <div className="rounded-xl border border-white/5 overflow-x-auto" style={{background:'var(--card-bg)'}}>
         {tab==='overview' && (
-          <table className="w-full text-xs"><thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
+          <table className="w-full text-xs"><thead><tr style={{background:'var(--table-head-bg,rgba(15,23,42,0.9))'}}>
             {['Date','Time','Mode','Status','Voyage','Sea Hrs','Anch','Manv','Tot Hrs','Dist NM','Obs Spd'].map(h=>(
               <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
             ))}
           </tr></thead><tbody>{records.map((r,i)=>(
-            <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
+            <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'var(--table-row-bg,rgba(15,23,42,0.3))':'transparent'}}>
               <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
               <td className="px-3 py-2 text-slate-400">{r.record_time||'—'}</td>
               <td className="px-3 py-2 text-slate-300">{r.mode||'—'}</td>
@@ -477,13 +477,13 @@ export function LPGMonthDetail() {
           ))}</tbody></table>
         )}
         {tab==='fuel' && (
-          <table className="w-full text-xs"><thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
+          <table className="w-full text-xs"><thead><tr style={{background:'var(--table-head-bg,rgba(15,23,42,0.9))'}}>
             {['Date','VLSFO ME','VLSFO AE','VLSFO Blr','VLSFO Total','VLSFO ROB','Bunkered','LSMGO ME','LSMGO AE','LSMGO Tot','LSMGO ROB','CO₂ MT'].map(h=>(
               <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
             ))}
           </tr></thead><tbody>
             {records.map((r,i)=>(
-              <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
+              <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'var(--table-row-bg,rgba(15,23,42,0.3))':'transparent'}}>
                 <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
                 <td className="px-3 py-2 text-right">{fmt(r.vlsfo_cons_me)}</td>
                 <td className="px-3 py-2 text-right">{fmt(r.vlsfo_cons_ae)}</td>
@@ -498,7 +498,7 @@ export function LPGMonthDetail() {
                 <td className="px-3 py-2 text-right text-red-300">{fmt(r.co2_emitted_mt)}</td>
               </tr>
             ))}
-            <tr className="border-t-2 border-amber-700/50 font-semibold" style={{background:'rgba(15,23,42,0.9)'}}>
+            <tr className="border-t-2 border-amber-700/50 font-semibold" style={{background:'var(--table-head-bg,rgba(15,23,42,0.9))'}}>
               <td className="px-3 py-2 text-amber-400">TOTALS</td>
               {['vlsfo_cons_me','vlsfo_cons_ae','vlsfo_cons_blr','vlsfo_total_cons'].map(f=>(
                 <td key={f} className="px-3 py-2 text-right text-amber-300">{fmt(sum(f))}</td>
@@ -514,12 +514,12 @@ export function LPGMonthDetail() {
           </tbody></table>
         )}
         {tab==='engine' && (
-          <table className="w-full text-xs"><thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
+          <table className="w-full text-xs"><thead><tr style={{background:'var(--table-head-bg,rgba(15,23,42,0.9))'}}>
             {['Date','CTR','RPM','Eng Dist','Obs Spd','Obs Dist','Slip %','BHP','KW','FO Dens'].map(h=>(
               <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
             ))}
           </tr></thead><tbody>{records.map((r,i)=>(
-            <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
+            <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'var(--table-row-bg,rgba(15,23,42,0.3))':'transparent'}}>
               <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
               <td className="px-3 py-2 text-right text-slate-400 font-mono">{fmt0(r.me_counter)}</td>
               <td className="px-3 py-2 text-right text-slate-300">{fmt(r.me_rpm,1)}</td>
@@ -534,12 +534,12 @@ export function LPGMonthDetail() {
           ))}</tbody></table>
         )}
         {tab==='running hrs' && (
-          <table className="w-full text-xs"><thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
+          <table className="w-full text-xs"><thead><tr style={{background:'var(--table-head-bg,rgba(15,23,42,0.9))'}}>
             {['Date','AE1 RHR','AE2 RHR','AE3 RHR','DG Total','AE Avg KW','Cargo Plant','RP1','RP2','RP3','RP Total','Cyl Oil L','Alexia70'].map(h=>(
               <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
             ))}
           </tr></thead><tbody>{records.map((r,i)=>(
-            <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
+            <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'var(--table-row-bg,rgba(15,23,42,0.3))':'transparent'}}>
               <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
               <td className="px-3 py-2 text-right">{fmt(r.ae1_rhr,1)}</td>
               <td className="px-3 py-2 text-right">{fmt(r.ae2_rhr,1)}</td>
@@ -557,12 +557,12 @@ export function LPGMonthDetail() {
           ))}</tbody></table>
         )}
         {tab==='fresh water' && (
-          <table className="w-full text-xs"><thead><tr style={{background:'rgba(15,23,42,0.9)'}}>
+          <table className="w-full text-xs"><thead><tr style={{background:'var(--table-head-bg,rgba(15,23,42,0.9))'}}>
             {['Date','FWG Counter','Dist Prod','Dist Cons','Dom Prod','Dom Cons','Total ROB','Port Tk','Stbd Tk'].map(h=>(
               <th key={h} className="px-3 py-2.5 text-left text-amber-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
             ))}
           </tr></thead><tbody>{records.map((r,i)=>(
-            <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'rgba(15,23,42,0.3)':'transparent'}}>
+            <tr key={r.id} className="border-t border-white/5 hover:bg-white/5" style={{background:i%2===0?'var(--table-row-bg,rgba(15,23,42,0.3))':'transparent'}}>
               <td className="px-3 py-2 text-amber-300 font-mono">{fmtD(r.record_date)}</td>
               <td className="px-3 py-2 text-right text-slate-400 font-mono">{fmt0(r.fw_fwg_counter)}</td>
               <td className="px-3 py-2 text-right text-green-300">{fmt(r.fw_distilled_prod,1)}</td>
@@ -595,7 +595,7 @@ function Field({ label, name, value, onChange, type='number', required }) {
 function Section({ title, children, defaultOpen=true }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="rounded-xl border border-white/5 overflow-hidden" style={{background:'rgba(15,23,42,0.7)'}}>
+    <div className="rounded-xl border border-white/5 overflow-hidden" style={{background:'var(--card-bg)'}}>
       <button onClick={()=>setOpen(!open)}
         className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-white/5 transition-colors">
         <span className="font-semibold text-sm text-slate-200">{title}</span>
@@ -690,7 +690,7 @@ export function LPGNoonForm() {
       </div>
       {error && <div className="mb-4 p-3 rounded-lg bg-red-900/30 text-red-300 text-sm">{error}</div>}
       <div className="space-y-4">
-        <div className="rounded-xl border border-amber-700/30 p-5" style={{background:'rgba(15,23,42,0.9)'}}>
+        <div className="rounded-xl border border-amber-700/30 p-5" style={{background:'var(--table-head-bg,rgba(15,23,42,0.9))'}}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {!isVesselUser ? (
               <div>
@@ -848,7 +848,7 @@ export function LPGImport() {
       )}
       {step==='preview' && preview && (
         <div className="space-y-4">
-          <div className="rounded-xl border border-white/5 p-5" style={{background:'rgba(8,15,30,0.8)'}}>
+          <div className="rounded-xl border border-white/5 p-5" style={{background:'var(--card-bg)'}}>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><span className="text-slate-500">Records found</span><div className="text-amber-300 font-bold text-lg">{preview.total}</div></div>
               <div><span className="text-slate-500">Voyages</span><div className="text-slate-200 font-bold text-lg">{preview.voyages?.length||0}</div></div>
@@ -856,7 +856,7 @@ export function LPGImport() {
               <div><span className="text-slate-500">To</span><div className="text-slate-300">{preview.date_to}</div></div>
             </div>
           </div>
-          <div className="rounded-xl border border-white/5 p-5" style={{background:'rgba(8,15,30,0.8)'}}>
+          <div className="rounded-xl border border-white/5 p-5" style={{background:'var(--card-bg)'}}>
             <label className="block text-sm text-slate-400 mb-2">Assign to vessel</label>
             <select value={vesselId} onChange={e=>setVesselId(e.target.value)}
               className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-white/10 text-slate-200 text-sm">
