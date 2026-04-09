@@ -95,7 +95,7 @@ async function initLpgSchema() {
     await client.query('ALTER TABLE lpg_noon_logs ALTER COLUMN voyage_number TYPE TEXT');
     await client.query('ALTER TABLE lpg_noon_logs ALTER COLUMN mode TYPE TEXT');
     // ── Vessel consolidation migration ─────────────────────────────────────
-    // Ensure "LPG Alfred Temile" and "LPG Alfred Temile 10" exist with correct names
+    // Ensure canonical vessels exist
     await client.query(`
       INSERT INTO lpg_vessels (name, imo, dwt, vessel_type)
       VALUES ('LPG Alfred Temile', '9859882', 5400, 'FRPG')
@@ -106,17 +106,13 @@ async function initLpgSchema() {
       VALUES ('LPG Alfred Temile 10', '9937127', 5400, 'FRPG')
       ON CONFLICT (name) DO NOTHING
     `);
-    // Reassign any records belonging to bare "Alfred Temile" → "LPG Alfred Temile"
+    // Purge bare "Alfred Temile" vessel and its records (data already lives on LPG Alfred Temile)
     await client.query(`
-      UPDATE lpg_noon_logs
-      SET vessel_id = (SELECT id FROM lpg_vessels WHERE name = 'LPG Alfred Temile' LIMIT 1)
-      WHERE vessel_id IN (
-        SELECT id FROM lpg_vessels WHERE name = 'Alfred Temile'
-      )
+      DELETE FROM lpg_noon_logs
+      WHERE vessel_id IN (SELECT id FROM lpg_vessels WHERE name = 'Alfred Temile')
     `);
-    // Remove the duplicate bare-name vessel
     await client.query(`DELETE FROM lpg_vessels WHERE name = 'Alfred Temile'`);
-    // Also clean up any legacy "LPG Alfred Temile" entries seeded into lng_vessels
+    // Clean up legacy lng_vessels entries
     await client.query(`DELETE FROM lng_vessels WHERE name IN ('LPG Alfred Temile', 'LPG Alfred Temile 10')`);
     console.log('[LPG] Schema ready');
   } catch(e) { console.error('[LPG] Schema error:', e.message); }
