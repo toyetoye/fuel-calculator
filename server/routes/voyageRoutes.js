@@ -49,6 +49,9 @@ router.get('/analytics', authenticate, async (req, res) => {
         ROUND(SUM(COALESCE(nr.distance_nm,0))::numeric,1)       AS distance_nm,
         ROUND(SUM(COALESCE(nr.hfo_consumed,0))::numeric,2)      AS hfo_consumed,
         ROUND(SUM(COALESCE(nr.foe_consumed,0))::numeric,4)      AS foe_consumed,
+        -- Monthly attained CII data
+        ROUND(((SUM(COALESCE(nr.hfo_consumed,0))*3.114 + SUM(COALESCE(nr.foe_consumed,0))*2.750)*1e6 /
+          NULLIF(SUM(COALESCE(lv.dwt,79581)*nr.distance_nm),0))::numeric,3) AS attained_cii,
         0::float                                                  AS net_excess,
         ROUND(SUM(COALESCE(lv.dwt,79581) * nr.distance_nm)::numeric,0) AS transport_work
       FROM noon_reports nr
@@ -64,9 +67,10 @@ router.get('/analytics', authenticate, async (req, res) => {
       SELECT
         COALESCE(SUM(nr.distance_nm),0)::float                     AS total_dist,
         COALESCE(SUM(nr.hfo_consumed),0)::float                    AS total_hfo,
+        COALESCE(SUM(nr.foe_consumed),0)::float                    AS total_foe,
         COUNT(DISTINCT v.id)::int                                   AS voyage_count,
         0::float                                                     AS net_excess,
-        -- CII transport work: sum(DWT_i × dist_i) per voyage day
+        -- CII transport work: Σ(DWT × dist) per noon report, using vessel-specific DWT
         COALESCE(SUM(COALESCE(lv.dwt,79581) * nr.distance_nm),0)::float AS transport_work
       FROM noon_reports nr
       JOIN voyages v ON v.id = nr.voyage_id
@@ -74,18 +78,19 @@ router.get('/analytics', authenticate, async (req, res) => {
       ${where}
     `, params)).rows[0];
 
-    // CII (LNG Carrier MEPC.339(76)) — aggregate attained CII to date
-    const ciiRef  = 9.827;
+    // Aggregate attained CII (gCO2/t·NM) — MEPC.339(76) LNG Carrier
+    // CO2 = HFO × CF_HFO + FOE × CF_FOE  (boil-off is a major LNG carrier CII factor)
+    // Attained CII = (total CO2 in t × 10^6) / transport_work(t·NM)
+    const ciiRef  = 9.827;   // LNG Carrier reference line (constant, DWT-independent)
     const year    = new Date().getFullYear();
     const Z       = ({2023:5,2024:5,2025:7,2026:9,2027:11})[year] || 9;
     const ciiReq  = ciiRef * (1 - Z/100);
     const dd = [0.82, 0.93, 1.14, 1.34];
     const bounds  = { A: ciiReq*dd[0], B: ciiReq*dd[1], C: ciiReq*dd[2], D: ciiReq*dd[3] };
 
-    // Aggregate attained CII = (total CO2 × 10^6) / transport_work
-    // where transport_work = Σ(DWT_i × distance_nm_i) summed over all noon reports
-    const CF_HFO = 3.114;
-    const co2  = parseFloat(totals.total_hfo) * CF_HFO;
+    const CF_HFO = 3.114;   // CO2 factor for HFO (t CO2/t fuel)
+    const CF_FOE = 2.750;   // CO2 factor for LNG boil-off (FOE)
+    const co2  = (parseFloat(totals.total_hfo) * CF_HFO) + (parseFloat(totals.total_foe) * CF_FOE);
     const tw   = parseFloat(totals.transport_work) || 0;
     const attained = tw > 0 ? (co2 * 1e6) / tw : 0;
     const rating = attained<=bounds.A?'A':attained<=bounds.B?'B':attained<=bounds.C?'C':attained<=bounds.D?'D':'E';
