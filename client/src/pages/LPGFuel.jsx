@@ -59,7 +59,7 @@ function LineChart({ data, yKey, label, color='#3B82F6', warningLine, yUnit='', 
           const v = (maxV/ticks)*i;
           return <g key={i}>
             <line x1={PL} y1={yp(v)} x2={W-PR} y2={yp(v)} stroke="rgba(255,255,255,0.04)" strokeWidth={1}/>
-            <text x={PL-4} y={yp(v)+4} fill="#475569" fontSize={9} textAnchor="end">{v.toFixed(v<10?1:0)}{yUnit}</text>
+            <text x={PL-4} y={yp(v)+4} fill="var(--chart-label,#94a3b8)" fontSize={9} textAnchor="end">{v.toFixed(v<10?1:0)}{yUnit}</text>
           </g>;
         })}
         {warningLine && <><line x1={PL} y1={yp(warningLine)} x2={W-PR} y2={yp(warningLine)} stroke="#F59E0B" strokeWidth={1} strokeDasharray="4,2"/>
@@ -74,7 +74,7 @@ function LineChart({ data, yKey, label, color='#3B82F6', warningLine, yUnit='', 
             onMouseLeave={()=>setTip(null)}
           />
         ))}
-        {data.map((d,i)=>i%(Math.ceil(data.length/6))===0&&<text key={i} x={xp(i)} y={H-4} fill="#475569" fontSize={9} textAnchor="middle">{d.month_label}</text>)}
+        {data.map((d,i)=>i%(Math.ceil(data.length/6))===0&&<text key={i} x={xp(i)} y={H-4} fill="var(--chart-label,#94a3b8)" fontSize={9} textAnchor="middle">{d.month_label}</text>)}
       </svg>
     </>
   );
@@ -98,7 +98,7 @@ function BarChart({ data, yKey, label, color='#B45309', yUnit='', tooltipLabel }
           const v=(maxV/ticks)*i;
           return <g key={i}>
             <line x1={PL} y1={PT+cH-(v/maxV)*cH} x2={W-PR} y2={PT+cH-(v/maxV)*cH} stroke="rgba(255,255,255,0.04)" strokeWidth={1}/>
-            <text x={PL-4} y={PT+cH-(v/maxV)*cH+4} fill="#475569" fontSize={9} textAnchor="end">{v.toFixed(v<10?1:0)}{yUnit}</text>
+            <text x={PL-4} y={PT+cH-(v/maxV)*cH+4} fill="var(--chart-label,#94a3b8)" fontSize={9} textAnchor="end">{v.toFixed(v<10?1:0)}{yUnit}</text>
           </g>;
         })}
         {vals.map((v,i)=>{
@@ -110,7 +110,7 @@ function BarChart({ data, yKey, label, color='#B45309', yUnit='', tooltipLabel }
             onMouseLeave={()=>setTip(null)}
           />;
         })}
-        {data.map((d,i)=>i%(Math.ceil(data.length/6))===0&&<text key={i} x={PL+i*gap+gap/2} y={H-4} fill="#475569" fontSize={9} textAnchor="middle">{d.month_label}</text>)}
+        {data.map((d,i)=>i%(Math.ceil(data.length/6))===0&&<text key={i} x={PL+i*gap+gap/2} y={H-4} fill="var(--chart-label,#94a3b8)" fontSize={9} textAnchor="middle">{d.month_label}</text>)}
       </svg>
     </>
   );
@@ -249,14 +249,14 @@ export function LPGDashboard() {
         <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
           <div className="mb-2">
             <h3 className="text-sm font-semibold text-slate-200">Propeller Slip Trend</h3>
-            <p className="text-xs text-slate-500">Monthly avg (sea passages only) — dashed = 6% hull fouling threshold</p>
+            <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Monthly avg (sea passages only) — dashed = 6% hull fouling threshold</p>
           </div>
           <LineChart data={monthly} yKey="avg_slip" color="#3B82F6" warningLine={6} yUnit="%" tooltipLabel="Avg propeller slip"/>
         </div>
         <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
           <div className="mb-2">
             <h3 className="text-sm font-semibold text-slate-200">VLSFO Consumption</h3>
-            <p className="text-xs text-slate-500">Monthly total (MT)</p>
+            <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Monthly total (MT)</p>
           </div>
           <BarChart data={monthly} yKey="vlsfo_cons" color="#B45309" yUnit=" MT" tooltipLabel="VLSFO consumed"/>
         </div>
@@ -266,7 +266,7 @@ export function LPGDashboard() {
         <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
           <div className="mb-2">
             <h3 className="text-sm font-semibold text-slate-200">Cylinder Oil Consumption Rate</h3>
-            <p className="text-xs text-slate-500">L per ME running hour</p>
+            <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>L per ME running hour</p>
           </div>
           <LineChart
             data={monthly.map(m=>({...m, cyl_rate: n0(m.me_running_hrs)>0 ? (n0(m.cyl_oil_cons)/n0(m.me_running_hrs)).toFixed(2) : 0}))}
@@ -275,7 +275,7 @@ export function LPGDashboard() {
         <div className="rounded-xl border border-white/5 p-4" style={{background:'rgba(15,23,42,0.7)'}}>
           <div className="mb-2">
             <h3 className="text-sm font-semibold text-slate-200">Average AE Load</h3>
-            <p className="text-xs text-slate-500">Monthly avg generator load (kW)</p>
+            <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Monthly avg generator load (kW)</p>
           </div>
           <LineChart data={monthly} yKey="avg_ae_kw" color="#A78BFA" yUnit=" kW" tooltipLabel="Avg AE load"/>
         </div>
