@@ -49,40 +49,45 @@ router.get('/analytics', authenticate, async (req, res) => {
         ROUND(SUM(COALESCE(nr.distance_nm,0))::numeric,1)       AS distance_nm,
         ROUND(SUM(COALESCE(nr.hfo_consumed,0))::numeric,2)      AS hfo_consumed,
         ROUND(SUM(COALESCE(nr.foe_consumed,0))::numeric,4)      AS foe_consumed,
-        0::float                                                  AS net_excess
+        0::float                                                  AS net_excess,
+        ROUND(SUM(COALESCE(lv.dwt,79581) * nr.distance_nm)::numeric,0) AS transport_work
       FROM noon_reports nr
       JOIN voyages v ON v.id = nr.voyage_id
+      LEFT JOIN lng_vessels lv ON lv.name = v.vessel_name
       ${where}
       GROUP BY month_key, month_label
       ORDER BY month_key ASC
     `, params)).rows;
 
-    // Totals
+    // Totals — uses per-vessel DWT for proper CII transport work calculation
     const totals = (await pool.query(`
       SELECT
-        COALESCE(SUM(nr.distance_nm),0)::float   AS total_dist,
-        COALESCE(SUM(nr.hfo_consumed),0)::float  AS total_hfo,
-        COUNT(DISTINCT v.id)::int                AS voyage_count,
-        0::float                                  AS net_excess
+        COALESCE(SUM(nr.distance_nm),0)::float                     AS total_dist,
+        COALESCE(SUM(nr.hfo_consumed),0)::float                    AS total_hfo,
+        COUNT(DISTINCT v.id)::int                                   AS voyage_count,
+        0::float                                                     AS net_excess,
+        -- CII transport work: sum(DWT_i × dist_i) per voyage day
+        COALESCE(SUM(COALESCE(lv.dwt,79581) * nr.distance_nm),0)::float AS transport_work
       FROM noon_reports nr
       JOIN voyages v ON v.id = nr.voyage_id
+      LEFT JOIN lng_vessels lv ON lv.name = v.vessel_name
       ${where}
     `, params)).rows[0];
 
-    // CII (LNG Carrier MEPC.339(76))
+    // CII (LNG Carrier MEPC.339(76)) — aggregate attained CII to date
     const ciiRef  = 9.827;
     const year    = new Date().getFullYear();
     const Z       = ({2023:5,2024:5,2025:7,2026:9,2027:11})[year] || 9;
     const ciiReq  = ciiRef * (1 - Z/100);
-    const d = [0.82, 0.93, 1.14, 1.34];
-    const bounds  = { A: ciiReq*d[0], B: ciiReq*d[1], C: ciiReq*d[2], D: ciiReq*d[3] };
+    const dd = [0.82, 0.93, 1.14, 1.34];
+    const bounds  = { A: ciiReq*dd[0], B: ciiReq*dd[1], C: ciiReq*dd[2], D: ciiReq*dd[3] };
 
-    // CII attained — using CF_HFO=3.114
+    // Aggregate attained CII = (total CO2 × 10^6) / transport_work
+    // where transport_work = Σ(DWT_i × distance_nm_i) summed over all noon reports
     const CF_HFO = 3.114;
-    const dwt = 79581; // Rivers class DWT (default)
-    const dist = parseFloat(totals.total_dist)||0;
-    const co2  = parseFloat(totals.total_hfo)*CF_HFO;
-    const attained = dist>0 ? (co2*1e6)/(dwt*dist) : 0;
+    const co2  = parseFloat(totals.total_hfo) * CF_HFO;
+    const tw   = parseFloat(totals.transport_work) || 0;
+    const attained = tw > 0 ? (co2 * 1e6) / tw : 0;
     const rating = attained<=bounds.A?'A':attained<=bounds.B?'B':attained<=bounds.C?'C':attained<=bounds.D?'D':'E';
 
     // Anomalies — voyages with high HFO (basic check)
