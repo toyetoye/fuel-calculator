@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import api from '../api';
+import { HelpButton } from '../HelpModal';
 
 const fmt  = (v,d=2) => (v==null||isNaN(v)||v==='')?'—':Number(v).toFixed(d);
 const fmt0 = v => (v==null||isNaN(v))?'—':Math.round(Number(v)).toLocaleString();
@@ -187,6 +188,7 @@ export default function LNGDashboard() {
           {isVessel && (
             <div className="px-3 py-1.5 rounded-lg bg-slate-800/50 border border-white/5 text-slate-300 text-sm">{selected}</div>
           )}
+          <HelpButton type="lng" />
           <button onClick={()=>nav('/voyages')}
             className="px-4 py-1.5 rounded-lg border border-white/10 text-slate-300 text-sm hover:bg-white/5 transition-colors">
             Voyages →
