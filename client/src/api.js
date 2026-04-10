@@ -7,7 +7,7 @@ const setUser = u => localStorage.setItem('fuel_user', JSON.stringify(u));
 async function apiFetch(path, opts = {}) {
   const token = getToken();
   const res = await fetch(BASE + path, { ...opts, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...opts.headers } });
-  if (res.status === 401) { localStorage.removeItem('fuel_token'); localStorage.removeItem('fuel_user'); window.location.href = '/login'; throw new Error('Unauthorized'); }
+  if (res.status === 401 && !path.includes('/auth/login')) { localStorage.removeItem('fuel_token'); localStorage.removeItem('fuel_user'); window.location.href = '/login'; throw new Error('Unauthorized'); }
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
@@ -67,7 +67,7 @@ const api = {
       headers: token ? { Authorization: 'Bearer ' + token } : {},
       body: formData,
     });
-    if (res.status === 401) { localStorage.removeItem('fuel_token'); localStorage.removeItem('fuel_user'); window.location.href = '/login'; throw new Error('Unauthorized'); }
+    if (res.status === 401 && !path.includes('/auth/login')) { localStorage.removeItem('fuel_token'); localStorage.removeItem('fuel_user'); window.location.href = '/login'; throw new Error('Unauthorized'); }
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Request failed');
     return data;
