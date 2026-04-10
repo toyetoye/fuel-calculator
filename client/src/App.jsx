@@ -122,6 +122,12 @@ function AppInner() {
   const [user, setUser] = useState(api.getUser());
   const loc = useLocation();
   const { theme } = useTheme();
+  const vn = user?.vessel_names || [];
+  const hasLpg = vn.some(v => v.toLowerCase().includes('alfred temile'));
+  const hasLng = vn.some(v => !v.toLowerCase().includes('alfred temile')) ||
+                 ['admin','manager','superintendent'].includes(user?.role);
+  const defaultRoute = !user ? '/login' : (hasLpg && !hasLng) ? '/lpg' : '/lng/dashboard';
+
   return (
     <AuthContext.Provider value={{ user, setUser }}>
       <div className="flex min-h-screen font-sans text-slate-200" style={{ background: theme.bg }}>
@@ -143,15 +149,7 @@ function AppInner() {
             <Route path="/vessels"           element={<ProtectedRoute><VesselManage /></ProtectedRoute>} />
             <Route path="/fuel-prices"       element={<ProtectedRoute><FuelPrices /></ProtectedRoute>} />
             <Route path="/users"             element={<ProtectedRoute><UserManage /></ProtectedRoute>} />
-            <Route path="*"                  element={<Navigate to={(() => {
-              if (!user) return '/login';
-              const vn = user.vessel_names || [];
-              const hasLpg = vn.some(v => v.toLowerCase().includes('alfred temile'));
-              const hasLng = vn.some(v => !v.toLowerCase().includes('alfred temile')) ||
-                             ['admin','manager','superintendent'].includes(user.role);
-              if (hasLpg && !hasLng) return '/lpg';
-              return '/lng/dashboard';
-            })()} />} />
+            <Route path="*"                  element={<Navigate to={defaultRoute} />} />
           </Routes>
         </div>
       </div>
