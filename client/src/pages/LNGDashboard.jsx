@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import api from '../api';
-import { HelpButton } from '../HelpModal';
+function HelpButton() { return null; }
 
 const fmt  = (v,d=2) => (v==null||isNaN(v)||v==='')?'—':Number(v).toFixed(d);
 const fmt0 = v => (v==null||isNaN(v))?'—':Math.round(Number(v)).toLocaleString();
@@ -301,8 +301,7 @@ export default function LNGDashboard() {
                     {monthly.slice().reverse().map((m,idx)=>{
                       const excess=parseFloat(m.net_excess)||0;
                       return (
-                        <tr key={m.month_key} style={{ background: idx % 2 === 0 ? 'var(--row-even)' : 'var(--row-odd)' }} className="border-t border-white/5 hover:brightness-110 transition-all"
-                          style={{background:i%2===0?'var(--table-row-bg,rgba(15,23,42,0.3))':'transparent'}}>
+                        <tr key={m.month_key} style={{ background: idx % 2 === 0 ? 'var(--row-even)' : 'var(--row-odd)' }} className="border-t border-white/5 hover:brightness-110 transition-all">
                           <td className="px-3 py-2 font-medium text-teal-300">{m.month_label}</td>
                           <td className="px-3 py-2 text-right text-slate-400">{m.voyage_count}</td>
                           <td className="px-3 py-2 text-right text-blue-300">{fmt(m.steaming_hrs,1)}</td>
