@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../App';
 import api from '../api';
-import { HelpButton } from '../HelpModal';
+function HelpButton() { return null; }
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 const fmt   = (v,d=2) => (v==null||isNaN(v)||v==='')?'—':Number(v).toFixed(d);
