@@ -22,8 +22,8 @@ export default function Login() {
       const d = await api.login(username, password);
       addLog('login success, setting user...');
       setUser(d.user);
-      addLog('navigating to /voyages...');
-      nav('/voyages');
+      addLog('navigating...');
+      window.location.href = '/voyages';
     } catch (e) {
       addLog('error: ' + e.message);
       setError(e.message);
