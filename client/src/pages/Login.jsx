@@ -23,7 +23,12 @@ export default function Login() {
       addLog('login success, setting user...');
       setUser(d.user);
       addLog('navigating...');
-      window.location.href = '/voyages';
+      // Manually ensure token and user are in localStorage before redirect
+      localStorage.setItem('fuel_token', d.token);
+      localStorage.setItem('fuel_user', JSON.stringify(d.user));
+      addLog('stored token: ' + d.token.slice(0,20) + '...');
+      addLog('stored user: ' + d.user.username);
+      setTimeout(() => { window.location.replace('/'); }, 300);
     } catch (e) {
       addLog('error: ' + e.message);
       setError(e.message);
