@@ -56,7 +56,7 @@ function Sidebar() {
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg,#B45309,#D97706)' }}>FC</div>
             <div>
-              <div className="text-sm font-bold text-slate-100">FORCAP</div>
+              <img src="/forcap-logo.png" alt="FORCAP" className="h-7 w-auto" />
               <div className="text-[10px] text-slate-500 uppercase tracking-widest">{user?.role}</div>
             </div>
           </div>
