@@ -55,7 +55,7 @@ function Sidebar() {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
             <div>
-              <img src="/forcap-logo.png" alt="FORCAP" className="h-7 w-auto" />
+              <img src="/forcap-logo.png" alt="FORCAP" className="h-12 w-auto" />
               <div className="text-[10px] text-slate-500 uppercase tracking-widest">{user?.role}</div>
             </div>
           </div>
