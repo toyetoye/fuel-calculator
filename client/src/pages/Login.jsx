@@ -30,7 +30,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(180deg,#0B1120,#0F172A,#111827)' }}>
       <div className="w-full max-w-sm px-4">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center text-xl font-bold text-white" style={{ background: 'linear-gradient(135deg,#B45309,#D97706)' }}>FC</div>
+          <img src="/forcap-logo.png" alt="FORCAP" className="h-16 w-auto mx-auto mb-2" />
           <h1 className="text-2xl font-bold text-white">Fuel Calculator</h1>
           <p className="text-sm text-gray-400 mt-1">FORCAP Fleet Intelligence</p>
         </div>
