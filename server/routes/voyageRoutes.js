@@ -210,6 +210,8 @@ async function calculateExcess(voyage, reports) {
 
   // Process each noon report
   let totalHours = 0, totalDistance = 0, totalHFO = 0, totalFOE = 0, totalFO = 0;
+  let totalNBO = 0, totalFBO = 0;
+  let nboFboDaysSeen = 0; // days where NBO or FBO was actually provided
   let totalGuaranteed = 0;
   let exclTime = 0, exclHFO = 0, exclFO = 0, exclDistance = 0, exclGuaranteed = 0;
 
@@ -218,6 +220,11 @@ async function calculateExcess(voyage, reports) {
     const distance = parseFloat(r.distance_nm) || 0;
     const hfo = parseFloat(r.hfo_consumed) || 0;
     const foe = parseFloat(r.foe_consumed) || 0;
+    const hasNbo = r.nbo_consumed !== null && r.nbo_consumed !== undefined;
+    const hasFbo = r.fbo_consumed !== null && r.fbo_consumed !== undefined;
+    const nbo = hasNbo ? (parseFloat(r.nbo_consumed) || 0) : 0;
+    const fbo = hasFbo ? (parseFloat(r.fbo_consumed) || 0) : 0;
+    if (hasNbo || hasFbo) nboFboDaysSeen += 1;
     const totalFuel = hfo + foe;
     const avgSpeed = hours > 0 ? distance / hours : 0;
     const interpolated = interpolateFuel(avgSpeed);
@@ -233,6 +240,8 @@ async function calculateExcess(voyage, reports) {
     totalDistance += distance;
     totalHFO += hfo;
     totalFOE += foe;
+    totalNBO += nbo;
+    totalFBO += fbo;
     totalFO += totalFuel;
     totalGuaranteed += interpolated;
 
@@ -322,6 +331,9 @@ async function calculateExcess(voyage, reports) {
     total_distance: totalDistance,
     total_hfo: totalHFO,
     total_foe: totalFOE,
+    total_nbo: nboFboDaysSeen > 0 ? totalNBO : null,
+    total_fbo: nboFboDaysSeen > 0 ? totalFBO : null,
+    nbo_fbo_days_seen: nboFboDaysSeen,
     total_fo: totalFO,
 
     // FOE/Boil-off
