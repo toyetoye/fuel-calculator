@@ -329,6 +329,84 @@ export default function VoyageDetail() {
               ))}
             </div>
           </div>
+
+          {/* NBO / FBO breakdown panel */}
+          <div className="rounded-xl p-5 border border-white/5 space-y-4" style={{ background: 'var(--card-bg)' }}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-amber-300">Boil-Off Composition (NBO vs FBO)</h3>
+              {calc.nbo_fbo_days_seen > 0 ? (
+                <span className="text-[10px] text-slate-500">
+                  Split recorded on {calc.nbo_fbo_days_seen} of {reports.length} day{reports.length === 1 ? '' : 's'}
+                </span>
+              ) : (
+                <span className="text-[10px] text-amber-600/80">No NBO/FBO split recorded yet — edit noon reports to capture it</span>
+              )}
+            </div>
+
+            {calc.nbo_fbo_days_seen > 0 ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg p-4 border border-sky-800/30" style={{ background: 'rgba(14,165,233,0.04)' }}>
+                  <div className="text-xs font-semibold text-sky-300 mb-2">Natural Boil-Off (NBO)</div>
+                  <div className="text-2xl font-mono text-sky-200 mb-1">{fmt(calc.total_nbo)} <span className="text-sm text-slate-500">MT</span></div>
+                  <div className="text-[10px] text-slate-500">
+                    {calc.passage_days > 0 && calc.total_nbo != null
+                      ? `Avg daily NBO: ${fmt(calc.total_nbo / calc.passage_days)} MT`
+                      : '—'}
+                  </div>
+                  {calc.total_foe > 0 && calc.total_nbo != null && (
+                    <div className="mt-2">
+                      <div className="h-1.5 rounded bg-slate-800 overflow-hidden">
+                        <div style={{ width: `${Math.min(100, (calc.total_nbo / calc.total_foe) * 100)}%`, background: '#0EA5E9' }} className="h-full" />
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-1">{fmt((calc.total_nbo / calc.total_foe) * 100, 1)}% of FOE</div>
+                    </div>
+                  )}
+                </div>
+                <div className="rounded-lg p-4 border border-violet-800/30" style={{ background: 'rgba(139,92,246,0.04)' }}>
+                  <div className="text-xs font-semibold text-violet-300 mb-2">Forced Boil-Off (FBO)</div>
+                  <div className="text-2xl font-mono text-violet-200 mb-1">{fmt(calc.total_fbo)} <span className="text-sm text-slate-500">MT</span></div>
+                  <div className="text-[10px] text-slate-500">
+                    {calc.passage_days > 0 && calc.total_fbo != null
+                      ? `Avg daily FBO: ${fmt(calc.total_fbo / calc.passage_days)} MT`
+                      : '—'}
+                  </div>
+                  {calc.total_foe > 0 && calc.total_fbo != null && (
+                    <div className="mt-2">
+                      <div className="h-1.5 rounded bg-slate-800 overflow-hidden">
+                        <div style={{ width: `${Math.min(100, (calc.total_fbo / calc.total_foe) * 100)}%`, background: '#8B5CF6' }} className="h-full" />
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-1">{fmt((calc.total_fbo / calc.total_foe) * 100, 1)}% of FOE</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500 py-3">
+                The single-value FOE figure above captures the total boil-off but doesn't distinguish between natural (NBO) and forced (FBO) boil-off.
+                Going forward, noon reports should capture the two components separately so we can verify NBO stays within the manufacturer's guaranteed boil-off rate.
+              </div>
+            )}
+
+            {/* Compliance check placeholder — activates once vessel.guaranteed_nbo_rate is populated */}
+            {calc.nbo_fbo_days_seen > 0 && calc.guaranteed_nbo_mt != null && calc.total_nbo != null && (
+              <div className="rounded-lg p-3 border" style={{
+                background: calc.total_nbo <= calc.guaranteed_nbo_mt ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)',
+                borderColor: calc.total_nbo <= calc.guaranteed_nbo_mt ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)'
+              }}>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400">NBO vs Manufacturer Guarantee</span>
+                  <span className="font-mono text-slate-200">
+                    {fmt(calc.total_nbo)} MT actual vs {fmt(calc.guaranteed_nbo_mt)} MT guaranteed
+                  </span>
+                </div>
+                <div className="mt-1 text-[10px]" style={{ color: calc.total_nbo <= calc.guaranteed_nbo_mt ? '#86EFAC' : '#FCA5A5' }}>
+                  {calc.total_nbo <= calc.guaranteed_nbo_mt
+                    ? `✓ Within guarantee (${fmt(((calc.total_nbo / calc.guaranteed_nbo_mt) - 1) * 100, 1)}% margin)`
+                    : `✗ Exceeds guarantee by ${fmt(calc.total_nbo - calc.guaranteed_nbo_mt)} MT (${fmt(((calc.total_nbo / calc.guaranteed_nbo_mt) - 1) * 100, 1)}%)`}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
