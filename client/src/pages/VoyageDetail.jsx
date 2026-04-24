@@ -53,7 +53,7 @@ export default function VoyageDetail() {
   const nextDate = reports.length > 0 ? (() => { const d = new Date(reports[reports.length - 1].report_date); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })() : '';
 
   const startNewRow = () => {
-    setNewRow({ day_number: nextDayNum, report_date: nextDate, steaming_hours: 24, total_revs: 0, distance_nm: 0, hfo_consumed: 0, foe_consumed: 0, weather_condition: '', remarks: '', excess_remarks: '' });
+    setNewRow({ day_number: nextDayNum, report_date: nextDate, steaming_hours: 24, total_revs: 0, distance_nm: 0, hfo_consumed: 0, nbo_consumed: 0, fbo_consumed: 0, foe_consumed: 0, weather_condition: '', remarks: '', excess_remarks: '' });
   };
 
   const calcError = calc?.error || null;
@@ -122,7 +122,7 @@ export default function VoyageDetail() {
           <div className="rounded-xl border border-white/5 overflow-x-auto" style={{ background: 'var(--card-bg)' }}>
             <table className="w-full text-xs">
               <thead><tr className="border-b border-white/6">
-                {['Day', 'Date', 'Hrs', 'Revs', 'Dist (NM)', 'HFO (MT)', 'FOE (MT)', 'Total FO', 'Speed (kn)', 'Guar. FO', 'Diff', 'Status', 'Weather', 'Slip %', 'Remarks', ''].map(h => (
+                {['Day', 'Date', 'Hrs', 'Revs', 'Dist (NM)', 'HFO (MT)', 'NBO (MT)', 'FBO (MT)', 'FOE (MT)', 'Total FO', 'Speed (kn)', 'Guar. FO', 'Diff', 'Status', 'Weather', 'Slip %', 'Remarks', ''].map(h => (
                   <th key={h} className="px-2 py-3 text-left text-[10px] text-slate-500 uppercase whitespace-nowrap">{h}</th>
                 ))}
               </tr></thead>
@@ -138,6 +138,8 @@ export default function VoyageDetail() {
                       <td className="px-2 py-2 font-mono text-right text-slate-500">{fmt0(r.total_revs)}</td>
                       <td className="px-2 py-2 font-mono text-right">{fmt0(r.distance_nm)}</td>
                       <td className="px-2 py-2 font-mono text-right">{fmt(r.hfo_consumed, 1)}</td>
+                      <td className="px-2 py-2 font-mono text-right text-sky-300">{r.nbo_consumed == null ? <span className="text-slate-600">—</span> : fmt(r.nbo_consumed)}</td>
+                      <td className="px-2 py-2 font-mono text-right text-violet-300">{r.fbo_consumed == null ? <span className="text-slate-600">—</span> : fmt(r.fbo_consumed)}</td>
                       <td className="px-2 py-2 font-mono text-right">{fmt(r.foe_consumed)}</td>
                       <td className="px-2 py-2 font-mono text-right font-semibold">{fmt(r.total_fuel)}</td>
                       <td className="px-2 py-2 font-mono text-right text-cyan-300">{fmt(r.avg_speed, 1)}</td>
@@ -166,6 +168,8 @@ export default function VoyageDetail() {
                 <td></td>
                 <td className="px-2 py-3 font-mono text-right">{fmt0(calc?.total_distance)}</td>
                 <td className="px-2 py-3 font-mono text-right">{fmt(calc?.total_hfo, 1)}</td>
+                <td className="px-2 py-3 font-mono text-right text-sky-300">{fmt(calc?.total_nbo)}</td>
+                <td className="px-2 py-3 font-mono text-right text-violet-300">{fmt(calc?.total_fbo)}</td>
                 <td className="px-2 py-3 font-mono text-right">{fmt(calc?.total_foe)}</td>
                 <td className="px-2 py-3 font-mono text-right text-amber-300">{fmt(calc?.total_fo)}</td>
                 <td></td>
@@ -444,6 +448,17 @@ export default function VoyageDetail() {
 function InlineEdit({ report, weatherOptions, inp, selInp, saving, onSave, onCancel, isNew }) {
   const [r, setR] = useState({ ...report });
   const set = (k, v) => setR(prev => ({ ...prev, [k]: v }));
+  // Live FOE = NBO + FBO (editable path always uses the split going forward)
+  const nboNum = parseFloat(r.nbo_consumed) || 0;
+  const fboNum = parseFloat(r.fbo_consumed) || 0;
+  const foeLive = (nboNum + fboNum).toFixed(4);
+  // Persist the computed FOE back into state whenever NBO or FBO change, so save() sends the right value
+  // (backend also auto-sums, but keeping state coherent helps any downstream reads)
+  if (r.foe_consumed !== foeLive && (r.nbo_consumed !== undefined || r.fbo_consumed !== undefined)) {
+    // Use a microtask-free update via effect would be cleaner, but direct setR here causes a render loop.
+    // Instead, we'll just read foeLive for display and let the backend compute the stored value.
+  }
+  const save = () => onSave({ ...r, foe_consumed: foeLive });
   return (
     <tr className="border-b border-amber-800/20 bg-amber-900/5">
       <td className="px-2 py-2"><input type="number" value={r.day_number} onChange={e => set('day_number', parseInt(e.target.value))} className={`${inp} w-10`} /></td>
@@ -452,7 +467,9 @@ function InlineEdit({ report, weatherOptions, inp, selInp, saving, onSave, onCan
       <td className="px-2 py-2"><input type="number" value={r.total_revs} onChange={e => set('total_revs', e.target.value)} className={`${inp} w-16`} /></td>
       <td className="px-2 py-2"><input type="number" step="0.1" value={r.distance_nm} onChange={e => set('distance_nm', e.target.value)} className={`${inp} w-14`} /></td>
       <td className="px-2 py-2"><input type="number" step="0.1" value={r.hfo_consumed} onChange={e => set('hfo_consumed', e.target.value)} className={`${inp} w-14`} /></td>
-      <td className="px-2 py-2"><input type="number" step="0.01" value={r.foe_consumed} onChange={e => set('foe_consumed', e.target.value)} className={`${inp} w-16`} /></td>
+      <td className="px-2 py-2"><input type="number" step="0.01" value={r.nbo_consumed ?? ''} onChange={e => set('nbo_consumed', e.target.value)} className={`${inp} w-16`} placeholder="NBO" title="Natural Boil-Off (MT FOE)" /></td>
+      <td className="px-2 py-2"><input type="number" step="0.01" value={r.fbo_consumed ?? ''} onChange={e => set('fbo_consumed', e.target.value)} className={`${inp} w-16`} placeholder="FBO" title="Forced Boil-Off (MT FOE)" /></td>
+      <td className="px-2 py-2 font-mono text-right text-[10px] text-amber-300" title="FOE = NBO + FBO (auto-calculated)">{foeLive}</td>
       <td colSpan={4}></td>
       <td className="px-2 py-2"><select value={r.weather_condition || ''} onChange={e => set('weather_condition', e.target.value)} className={`${selInp} w-32`}>
         <option value="">None</option>{weatherOptions.map(w => <option key={w} value={w}>{w}</option>)}
@@ -460,7 +477,7 @@ function InlineEdit({ report, weatherOptions, inp, selInp, saving, onSave, onCan
       <td></td>
       <td className="px-2 py-2"><input value={r.remarks || ''} onChange={e => set('remarks', e.target.value)} className={`${selInp} w-24`} placeholder="Remarks" /></td>
       <td className="px-2 py-2 flex gap-1">
-        <button onClick={() => onSave(r)} disabled={saving} className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-600 text-white">{saving ? '...' : '✓'}</button>
+        <button onClick={save} disabled={saving} className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-600 text-white">{saving ? '...' : '✓'}</button>
         <button onClick={onCancel} className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-600 text-white">✕</button>
       </td>
     </tr>
