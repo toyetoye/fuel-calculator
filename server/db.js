@@ -100,6 +100,8 @@ const initDB = async () => {
         distance_nm DECIMAL(8,2) DEFAULT 0,
         hfo_consumed DECIMAL(8,2) DEFAULT 0,
         foe_consumed DECIMAL(10,4) DEFAULT 0,
+        nbo_consumed DECIMAL(10,4),
+        fbo_consumed DECIMAL(10,4),
         weather_condition VARCHAR(100),
         remarks VARCHAR(500),
         excess_remarks VARCHAR(500),
@@ -129,6 +131,13 @@ const initDB = async () => {
       );
     `);
     console.log('Fuel calculator tables initialized');
+
+    // ── Migration: add NBO/FBO columns to noon_reports on existing deployments ──
+    await client.query(`
+      ALTER TABLE noon_reports ADD COLUMN IF NOT EXISTS nbo_consumed DECIMAL(10,4);
+      ALTER TABLE noon_reports ADD COLUMN IF NOT EXISTS fbo_consumed DECIMAL(10,4);
+    `);
+    console.log('[Schema] NBO/FBO columns ensured on noon_reports');
 
     // ── Curve migration: seed Rivers Plus BALLAST from Rivers BALLAST if empty ──
     const rpBallastCount = await client.query(
