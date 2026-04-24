@@ -49,6 +49,10 @@ router.get('/analytics', authenticate, async (req, res) => {
         ROUND(SUM(COALESCE(nr.distance_nm,0))::numeric,1)       AS distance_nm,
         ROUND(SUM(COALESCE(nr.hfo_consumed,0))::numeric,2)      AS hfo_consumed,
         ROUND(SUM(COALESCE(nr.foe_consumed,0))::numeric,4)      AS foe_consumed,
+        -- NBO/FBO split (SUM ignores NULLs naturally; returns NULL if no rows have the split)
+        ROUND(SUM(nr.nbo_consumed)::numeric,4)                  AS nbo_consumed,
+        ROUND(SUM(nr.fbo_consumed)::numeric,4)                  AS fbo_consumed,
+        COUNT(nr.nbo_consumed)::int + COUNT(nr.fbo_consumed)::int AS split_field_count,
         -- Monthly attained CII data
         ROUND(((SUM(COALESCE(nr.hfo_consumed,0))*3.114 + SUM(COALESCE(nr.foe_consumed,0))*2.750)*1e6 /
           NULLIF(SUM(COALESCE(lv.dwt,79581)*nr.distance_nm),0))::numeric,3) AS attained_cii,
@@ -68,6 +72,10 @@ router.get('/analytics', authenticate, async (req, res) => {
         COALESCE(SUM(nr.distance_nm),0)::float                     AS total_dist,
         COALESCE(SUM(nr.hfo_consumed),0)::float                    AS total_hfo,
         COALESCE(SUM(nr.foe_consumed),0)::float                    AS total_foe,
+        SUM(nr.nbo_consumed)::float                                AS total_nbo,
+        SUM(nr.fbo_consumed)::float                                AS total_fbo,
+        (COUNT(nr.nbo_consumed) + COUNT(nr.fbo_consumed))::int     AS split_field_count,
+        COUNT(*)::int                                               AS total_reports,
         COUNT(DISTINCT v.id)::int                                   AS voyage_count,
         0::float                                                     AS net_excess,
         -- CII transport work: Σ(DWT × dist) per noon report, using vessel-specific DWT
