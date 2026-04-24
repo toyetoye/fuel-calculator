@@ -214,6 +214,50 @@ export default function LNGDashboard() {
             <StatCard label="Voyages" value={fmt0(totals.voyage_count)}/>
           </div>
 
+          {/* Boil-off composition strip — only when at least some reports have the split */}
+          {totals.total_nbo != null && totals.total_fbo != null && (
+            <div className="rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-slate-200">Boil-Off Composition</h3>
+                <span className="text-[10px] text-slate-500">
+                  Split recorded on approx. {fmt0((totals.split_field_count || 0) / 2)} of {fmt0(totals.total_reports)} noon reports
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="rounded-lg p-3 border border-sky-800/30" style={{background:'rgba(14,165,233,0.04)'}}>
+                  <div className="text-[10px] uppercase tracking-wide text-sky-300/80 mb-1">Natural Boil-Off</div>
+                  <div className="text-xl font-mono text-sky-200">{fmt(totals.total_nbo)} <span className="text-xs text-slate-500">MT</span></div>
+                </div>
+                <div className="rounded-lg p-3 border border-violet-800/30" style={{background:'rgba(139,92,246,0.04)'}}>
+                  <div className="text-[10px] uppercase tracking-wide text-violet-300/80 mb-1">Forced Boil-Off</div>
+                  <div className="text-xl font-mono text-violet-200">{fmt(totals.total_fbo)} <span className="text-xs text-slate-500">MT</span></div>
+                </div>
+                <div className="rounded-lg p-3 border border-amber-800/30" style={{background:'rgba(245,158,11,0.04)'}}>
+                  <div className="text-[10px] uppercase tracking-wide text-amber-300/80 mb-1">Total FOE (all reports)</div>
+                  <div className="text-xl font-mono text-amber-200">{fmt(totals.total_foe)} <span className="text-xs text-slate-500">MT</span></div>
+                </div>
+              </div>
+              {(parseFloat(totals.total_nbo) + parseFloat(totals.total_fbo)) > 0 && (
+                <div className="mt-3">
+                  <div className="h-2 rounded bg-slate-800 overflow-hidden flex">
+                    <div style={{
+                      width: `${(parseFloat(totals.total_nbo) / (parseFloat(totals.total_nbo) + parseFloat(totals.total_fbo))) * 100}%`,
+                      background: '#0EA5E9'
+                    }} className="h-full"/>
+                    <div style={{
+                      width: `${(parseFloat(totals.total_fbo) / (parseFloat(totals.total_nbo) + parseFloat(totals.total_fbo))) * 100}%`,
+                      background: '#8B5CF6'
+                    }} className="h-full"/>
+                  </div>
+                  <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                    <span>NBO {fmt((parseFloat(totals.total_nbo) / (parseFloat(totals.total_nbo) + parseFloat(totals.total_fbo))) * 100, 1)}%</span>
+                    <span>FBO {fmt((parseFloat(totals.total_fbo) / (parseFloat(totals.total_nbo) + parseFloat(totals.total_fbo))) * 100, 1)}%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* CII + Anomalies */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <CIIBadge rating={hasData ? cii.rating : '—'} attained={cii.attained} required={cii.ciiReq}/>
@@ -283,6 +327,26 @@ export default function LNGDashboard() {
             </div>
           </div>
 
+          {/* NBO / FBO breakdown — only when any month has split data */}
+          {monthly.some(m => m.nbo_consumed != null || m.fbo_consumed != null) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
+                <div className="mb-2">
+                  <h3 className="text-sm font-semibold text-slate-200">Natural Boil-Off (NBO)</h3>
+                  <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Monthly total (MT) — should trend within manufacturer guarantee</p>
+                </div>
+                <BarChart data={monthly} yKey="nbo_consumed" color="#0EA5E9" yUnit=" MT" tooltipLabel="NBO"/>
+              </div>
+              <div className="rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
+                <div className="mb-2">
+                  <h3 className="text-sm font-semibold text-slate-200">Forced Boil-Off (FBO)</h3>
+                  <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Monthly total (MT) — driven by cargo operations &amp; speed</p>
+                </div>
+                <BarChart data={monthly} yKey="fbo_consumed" color="#8B5CF6" yUnit=" MT" tooltipLabel="FBO"/>
+              </div>
+            </div>
+          )}
+
           {/* Monthly summary table */}
           {hasData && (
             <div className="rounded-xl border border-white/5 overflow-hidden" style={{background:'var(--card-bg)'}}>
@@ -293,7 +357,7 @@ export default function LNGDashboard() {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead><tr style={{background:'var(--table-head-bg,rgba(15,23,42,0.9))'}}>
-                    {['Month','Voyages','Sea Hrs','Distance NM','HFO (MT)','FOE (MT)','Att. CII','Net Excess','Status'].map(h=>(
+                    {['Month','Voyages','Sea Hrs','Distance NM','HFO (MT)','NBO (MT)','FBO (MT)','FOE (MT)','Att. CII','Net Excess','Status'].map(h=>(
                       <th key={h} className="px-3 py-2.5 text-left text-teal-400 uppercase tracking-wide font-semibold whitespace-nowrap">{h}</th>
                     ))}
                   </tr></thead>
@@ -307,6 +371,8 @@ export default function LNGDashboard() {
                           <td className="px-3 py-2 text-right text-blue-300">{fmt(m.steaming_hrs,1)}</td>
                           <td className="px-3 py-2 text-right text-slate-300">{fmt0(m.distance_nm)}</td>
                           <td className="px-3 py-2 text-right font-semibold text-amber-300">{fmt(m.hfo_consumed)}</td>
+                          <td className="px-3 py-2 text-right text-sky-300">{m.nbo_consumed == null ? <span className="text-slate-600">—</span> : fmt(m.nbo_consumed)}</td>
+                          <td className="px-3 py-2 text-right text-violet-300">{m.fbo_consumed == null ? <span className="text-slate-600">—</span> : fmt(m.fbo_consumed)}</td>
                           <td className="px-3 py-2 text-right text-slate-300">{fmt(m.foe_consumed,3)}</td>
                           <td className="px-3 py-2 text-right text-xs font-mono"
                             style={{color:parseFloat(m.attained_cii)>8.943?'#EF4444':parseFloat(m.attained_cii)>0?'#22C55E':'#475569'}}>
