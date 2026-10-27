@@ -123,9 +123,11 @@ router.get('/analytics', authenticate, async (req, res) => {
 });
 
 // Per-voyage excess-fuel trend (dashboard chart)
-// Returns one row per voyage: actual_fo, guaranteed_fo, excess_fo, sorted chronologically.
-// Guaranteed is computed per noon-report by looking up the vessel-class interpolation curve
-// at each day's avg speed (same LOOKUP floor semantics as calculateExcess).
+// Uses the proven calculateExcess() function so numbers match the voyage-detail page
+// and the Fleet Support claim summary (net of weather exclusions).
+// Returns per voyage: actual_net (fuel burned on non-excluded days), guaranteed_net
+// (interp at net avg speed × net days), excess_net = actual_net - guaranteed_net.
+// Also returns gross figures for comparison.
 router.get('/excess-trend', authenticate, async (req, res) => {
   try {
     const { vessel_name } = req.query;
@@ -133,40 +135,57 @@ router.get('/excess-trend', authenticate, async (req, res) => {
     const clauses = [];
     if (vessel_name) { params.push(vessel_name); clauses.push(`v.vessel_name = $${params.length}`); }
     const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
-    const rows = (await pool.query(`
-      SELECT
-        v.id AS voyage_id,
-        v.vessel_name,
-        v.voyage_number,
-        v.leg_type,
-        MIN(nr.report_date)::date AS first_date,
-        MAX(nr.report_date)::date AS last_date,
-        COUNT(nr.*)::int AS reports,
-        ROUND(SUM(COALESCE(nr.hfo_consumed,0) + COALESCE(nr.foe_consumed,0))::numeric, 2)::float AS actual_fo,
-        ROUND(SUM(COALESCE(interp.fuel, 0))::numeric, 2)::float AS guaranteed_fo,
-        ROUND(SUM(
-          COALESCE(nr.hfo_consumed,0) + COALESCE(nr.foe_consumed,0) - COALESCE(interp.fuel, 0)
-        )::numeric, 2)::float AS excess_fo
+    // Pull voyages + reports in one go
+    const voyages = (await pool.query(`
+      SELECT v.*
       FROM voyages v
-      JOIN noon_reports nr ON nr.voyage_id = v.id
-      JOIN lng_vessels lv ON lv.name = v.vessel_name
-      LEFT JOIN LATERAL (
-        SELECT ic.fuel
-        FROM interpolation_curves ic
-        WHERE ic.vessel_class = lv.vessel_class
-          AND ic.leg_type = v.leg_type
-          AND ic.speed <= CASE WHEN COALESCE(nr.steaming_hours, 0) > 0
-                               THEN nr.distance_nm / nr.steaming_hours
-                               ELSE 0 END
-        ORDER BY ic.speed DESC
-        LIMIT 1
-      ) interp ON TRUE
       ${where}
-      GROUP BY v.id, v.vessel_name, v.voyage_number, v.leg_type
-      HAVING COUNT(nr.*) > 0
-      ORDER BY MIN(nr.report_date) ASC NULLS LAST
+      ORDER BY v.id
     `, params)).rows;
-    res.json(rows);
+    const reportsR = await pool.query(`
+      SELECT nr.*
+      FROM noon_reports nr
+      JOIN voyages v ON v.id = nr.voyage_id
+      ${where}
+      ORDER BY nr.voyage_id, nr.day_number
+    `, params);
+    // Group reports by voyage
+    const reportsByVoy = {};
+    for (const r of reportsR.rows) {
+      (reportsByVoy[r.voyage_id] = reportsByVoy[r.voyage_id] || []).push(r);
+    }
+    // Compute per voyage
+    const results = [];
+    for (const voy of voyages) {
+      const reps = reportsByVoy[voy.id] || [];
+      if (!reps.length) continue;
+      const calc = await calculateExcess(voy, reps);
+      if (calc.error) continue;
+      // Net actual = total_fo - excluded_fo (fuel on non-excluded days from noon reports)
+      const net_actual = (calc.total_fo || 0) - (calc.excluded_fo || 0);
+      const net_guaranteed = calc.guaranteed_passage_fuel || 0;
+      const net_excess = net_actual - net_guaranteed;
+      const first_date = reps[0].report_date;
+      const last_date = reps[reps.length - 1].report_date;
+      results.push({
+        voyage_id: voy.id,
+        vessel_name: voy.vessel_name,
+        voyage_number: voy.voyage_number,
+        leg_type: voy.leg_type,
+        first_date, last_date,
+        reports: reps.length,
+        // NET (post-exclusion) — the charter-party / Fleet Support figure
+        actual_fo:     Math.round(net_actual * 100) / 100,
+        guaranteed_fo: Math.round(net_guaranteed * 100) / 100,
+        excess_fo:     Math.round(net_excess * 100) / 100,
+        // GROSS reference — useful for operational monitoring
+        gross_actual:     Math.round((calc.total_fo || 0) * 100) / 100,
+        gross_guaranteed: Math.round((calc.simple_guaranteed || 0) * 100) / 100,
+        gross_excess:     Math.round((calc.simple_excess || 0) * 100) / 100,
+      });
+    }
+    results.sort((a, b) => String(a.first_date).localeCompare(String(b.first_date)));
+    res.json(results);
   } catch (e) {
     console.error('[excess-trend]', e);
     res.status(500).json({ error: e.message });
