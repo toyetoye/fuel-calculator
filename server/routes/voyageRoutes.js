@@ -122,6 +122,57 @@ router.get('/analytics', authenticate, async (req, res) => {
   } catch(e) { console.error('[LNG analytics]',e); res.status(500).json({ error: e.message }); }
 });
 
+// Per-voyage excess-fuel trend (dashboard chart)
+// Returns one row per voyage: actual_fo, guaranteed_fo, excess_fo, sorted chronologically.
+// Guaranteed is computed per noon-report by looking up the vessel-class interpolation curve
+// at each day's avg speed (same LOOKUP floor semantics as calculateExcess).
+router.get('/excess-trend', authenticate, async (req, res) => {
+  try {
+    const { vessel_name } = req.query;
+    const params = [];
+    const clauses = [];
+    if (vessel_name) { params.push(vessel_name); clauses.push(`v.vessel_name = $${params.length}`); }
+    const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
+    const rows = (await pool.query(`
+      SELECT
+        v.id AS voyage_id,
+        v.vessel_name,
+        v.voyage_number,
+        v.leg_type,
+        MIN(nr.report_date)::date AS first_date,
+        MAX(nr.report_date)::date AS last_date,
+        COUNT(nr.*)::int AS reports,
+        ROUND(SUM(COALESCE(nr.hfo_consumed,0) + COALESCE(nr.foe_consumed,0))::numeric, 2)::float AS actual_fo,
+        ROUND(SUM(COALESCE(interp.fuel, 0))::numeric, 2)::float AS guaranteed_fo,
+        ROUND(SUM(
+          COALESCE(nr.hfo_consumed,0) + COALESCE(nr.foe_consumed,0) - COALESCE(interp.fuel, 0)
+        )::numeric, 2)::float AS excess_fo
+      FROM voyages v
+      JOIN noon_reports nr ON nr.voyage_id = v.id
+      JOIN lng_vessels lv ON lv.name = v.vessel_name
+      LEFT JOIN LATERAL (
+        SELECT ic.fuel
+        FROM interpolation_curves ic
+        WHERE ic.vessel_class = lv.vessel_class
+          AND ic.leg_type = v.leg_type
+          AND ic.speed <= CASE WHEN COALESCE(nr.steaming_hours, 0) > 0
+                               THEN nr.distance_nm / nr.steaming_hours
+                               ELSE 0 END
+        ORDER BY ic.speed DESC
+        LIMIT 1
+      ) interp ON TRUE
+      ${where}
+      GROUP BY v.id, v.vessel_name, v.voyage_number, v.leg_type
+      HAVING COUNT(nr.*) > 0
+      ORDER BY MIN(nr.report_date) ASC NULLS LAST
+    `, params)).rows;
+    res.json(rows);
+  } catch (e) {
+    console.error('[excess-trend]', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 
 module.exports = router;
 // Get single voyage with reports and calculation
