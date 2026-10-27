@@ -161,12 +161,17 @@ router.get('/excess-trend', authenticate, async (req, res) => {
       if (!reps.length) continue;
       const calc = await calculateExcess(voy, reps);
       if (calc.error) continue;
-      // Net actual = total_fo - excluded_fo (fuel on non-excluded days from noon reports)
-      const net_actual = (calc.total_fo || 0) - (calc.excluded_fo || 0);
-      const net_guaranteed = calc.guaranteed_passage_fuel || 0;
-      const net_excess = net_actual - net_guaranteed;
+      // REIMBURSABLE excess (what Fleet Support claims against the charterer):
+      //   simple_reimbursable = simple_excess − simple_excl_fo
+      //                       = (totalFO − Σinterp) − (exclFO − Σinterp_excluded)
+      //                       = (nonExclFO − Σinterp_nonExcluded)
+      // Mathematically identical to "non-excluded actual − non-excluded guaranteed" per day.
+      const reimbursable = calc.simple_reimbursable || 0;
       const first_date = reps[0].report_date;
       const last_date = reps[reps.length - 1].report_date;
+      // Non-excluded actual = total_fo − excluded_fo. Non-excluded guar = above − simple_excl_fo
+      const nonExclActual = (calc.total_fo || 0) - (calc.excluded_fo || 0);
+      const nonExclGuar = nonExclActual - reimbursable;
       results.push({
         voyage_id: voy.id,
         vessel_name: voy.vessel_name,
@@ -174,11 +179,11 @@ router.get('/excess-trend', authenticate, async (req, res) => {
         leg_type: voy.leg_type,
         first_date, last_date,
         reports: reps.length,
-        // NET (post-exclusion) — the charter-party / Fleet Support figure
-        actual_fo:     Math.round(net_actual * 100) / 100,
-        guaranteed_fo: Math.round(net_guaranteed * 100) / 100,
-        excess_fo:     Math.round(net_excess * 100) / 100,
-        // GROSS reference — useful for operational monitoring
+        // REIMBURSABLE — the Fleet Support / charter-party claim figure
+        actual_fo:     Math.round(nonExclActual * 100) / 100,
+        guaranteed_fo: Math.round(nonExclGuar * 100) / 100,
+        excess_fo:     Math.round(reimbursable * 100) / 100,
+        // GROSS reference — operational monitoring, no exclusion applied
         gross_actual:     Math.round((calc.total_fo || 0) * 100) / 100,
         gross_guaranteed: Math.round((calc.simple_guaranteed || 0) * 100) / 100,
         gross_excess:     Math.round((calc.simple_excess || 0) * 100) / 100,
