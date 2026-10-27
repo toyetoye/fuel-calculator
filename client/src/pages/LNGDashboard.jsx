@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import api from '../api';
@@ -159,12 +159,13 @@ function ExcessChart({ data }) {
           const barH = Math.abs(v / yRange) * cH;
           const d = data[i];
           const color = v >= 0 ? RED : GREEN;
+          const isYtd = d.leg_type === 'YTD';
           return (
             <rect key={i} x={x} y={barTop} width={bW} height={Math.max(1, barH)} fill={color} rx={2} opacity={0.9}
               style={{ cursor: 'pointer' }}
               onMouseEnter={e => setTip({
                 x: e.clientX, y: e.clientY,
-                label: `${d.vessel_name} — ${d.voyage_number} ${d.leg_type}`,
+                label: isYtd ? `${d.vessel_name} — YTD (${d.voyage_count} voyages)` : `${d.vessel_name} — ${d.voyage_number} ${d.leg_type}`,
                 value: `${v >= 0 ? '+' : ''}${fmt(v, 1)} MT`,
                 sub: `Actual ${fmt(d.actual_fo, 1)} MT  /  Guaranteed ${fmt(d.guaranteed_fo, 1)} MT  (${d.first_date} → ${d.last_date})`,
               })}
@@ -172,15 +173,18 @@ function ExcessChart({ data }) {
             />
           );
         })}
-        {/* X-axis labels — show every Nth voyno so they don't collide */}
+        {/* X-axis labels */}
         {data.map((d, i) => {
-          const step = Math.max(1, Math.ceil(data.length / 12));
+          const step = data.length <= 12 ? 1 : Math.max(1, Math.ceil(data.length / 12));
           if (i % step !== 0) return null;
           const x = PL + i * gap + gap / 2;
-          const label = (d.voyage_number || '').slice(-6);
+          // YTD mode: short vessel name; voyage mode: last 6 chars of voyno
+          const label = d.leg_type === 'YTD'
+            ? (d.vessel_name || '').replace('LNG ', '').replace('-', '')
+            : (d.voyage_number || '').slice(-6);
           return (
-            <text key={i} x={x} y={H - 4} fill="var(--chart-label,#94a3b8)" fontSize={8.5} textAnchor="middle"
-              transform={`rotate(-30 ${x} ${H - 4})`}>{label}</text>
+            <text key={i} x={x} y={H - 4} fill="var(--chart-label,#94a3b8)" fontSize={d.leg_type === 'YTD' ? 10 : 8.5}
+              textAnchor="middle" transform={d.leg_type === 'YTD' ? '' : `rotate(-30 ${x} ${H - 4})`}>{label}</text>
           );
         })}
       </svg>
@@ -255,6 +259,31 @@ export default function LNGDashboard() {
   const { monthly=[], totals={}, cii={}, anomalies=[] } = data || {};
   const hasData = monthly.length > 0;
 
+  // Chart data: fleet view aggregates per-vessel YTD; single-vessel view keeps per-voyage detail
+  const excessChartData = useMemo(() => {
+    if (selected !== FLEET_KEY) return excess;
+    const by = {};
+    for (const v of excess) {
+      if (!by[v.vessel_name]) {
+        by[v.vessel_name] = {
+          vessel_name: v.vessel_name,
+          voyage_number: v.vessel_name.replace('LNG ', ''),  // chart label
+          leg_type: 'YTD',
+          first_date: v.first_date, last_date: v.last_date,
+          actual_fo: 0, guaranteed_fo: 0, excess_fo: 0, voyage_count: 0,
+        };
+      }
+      by[v.vessel_name].actual_fo += v.actual_fo || 0;
+      by[v.vessel_name].guaranteed_fo += v.guaranteed_fo || 0;
+      by[v.vessel_name].excess_fo += v.excess_fo || 0;
+      by[v.vessel_name].voyage_count += 1;
+      // Expand date range
+      if (v.first_date < by[v.vessel_name].first_date) by[v.vessel_name].first_date = v.first_date;
+      if (v.last_date > by[v.vessel_name].last_date) by[v.vessel_name].last_date = v.last_date;
+    }
+    return Object.values(by).sort((a, b) => b.excess_fo - a.excess_fo);  // worst performers on left
+  }, [excess, selected]);
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -298,6 +327,40 @@ export default function LNGDashboard() {
               color={parseFloat(totals.net_excess)>0?'red':'green'}
               sub={hasData ? (parseFloat(totals.net_excess)>0?'above charter allowance':'within allowance') : 'No voyages yet'}/>
             <StatCard label="Voyages" value={fmt0(totals.voyage_count)}/>
+          </div>
+
+          {/* CII + Anomalies (moved up for management visibility) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <CIIBadge rating={hasData ? cii.rating : '—'} attained={cii.attained} required={cii.ciiReq}/>
+            <div className="md:col-span-2 rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-200">Alerts & Anomalies</h3>
+                <span className={`px-2 py-0.5 text-xs rounded font-bold ${anomalies.length>0?'bg-amber-600 text-white':'bg-emerald-600 text-white'}`}>
+                  {anomalies.length>0?`${anomalies.length} items`:'✓ Clear'}
+                </span>
+              </div>
+              {!hasData ? (
+                <div className="text-sm text-slate-500 italic">
+                  {selected === FLEET_KEY
+                    ? 'No voyages have been entered yet. Use the Voyages page to create your first voyage and noon reports.'
+                    : `No voyages recorded for ${selected}. Select a different vessel or use All Vessels view.`}
+                </div>
+              ) : anomalies.length === 0 ? (
+                <div className="text-sm text-green-400 flex items-center gap-2"><span>✓</span> No anomalies detected</div>
+              ) : (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {anomalies.map((a,i)=>(
+                    <div key={i} className="flex items-start gap-2 text-xs p-2 rounded-lg bg-amber-900/20 border border-amber-700/20">
+                      <span className="text-amber-400 mt-0.5">⚠</span>
+                      <div>
+                        <span className="text-slate-300 font-mono mr-2">{a.vessel_name} — {a.voyage_number}</span>
+                        <span className="text-amber-300">{a.message}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Boil-off composition strip — only when at least some reports have the split */}
@@ -344,57 +407,28 @@ export default function LNGDashboard() {
             </div>
           )}
 
-          {/* Per-voyage excess fuel trend — management KPI */}
-          {excess.length > 0 && (
+          {/* Excess fuel chart — fleet view aggregates per-vessel YTD; single vessel view shows per-voyage detail */}
+          {excessChartData.length > 0 && (
             <div className="rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-200">Excess Fuel per Voyage</h3>
-                  <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Actual − guaranteed consumption, chronological. Positive bars = chargeable to charterer.</p>
+                  <h3 className="text-sm font-semibold text-slate-200">
+                    {selected === FLEET_KEY ? 'Excess Fuel per Vessel — YTD' : 'Excess Fuel per Voyage'}
+                  </h3>
+                  <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>
+                    Actual − guaranteed consumption. Positive bars = chargeable to charterer.
+                    {selected === FLEET_KEY ? ' Sorted worst → best.' : ' Chronological.'}
+                  </p>
                 </div>
                 <div className="text-right text-[10px] text-slate-500">
-                  <div>Σ positive: <span className="text-red-400 font-mono">+{fmt(excess.filter(x=>x.excess_fo>0).reduce((s,x)=>s+x.excess_fo,0),1)} MT</span></div>
-                  <div>Σ negative: <span className="text-emerald-400 font-mono">{fmt(excess.filter(x=>x.excess_fo<0).reduce((s,x)=>s+x.excess_fo,0),1)} MT</span></div>
-                  <div>Net: <span className="font-mono text-slate-300">{(excess.reduce((s,x)=>s+x.excess_fo,0)>=0?'+':'')}{fmt(excess.reduce((s,x)=>s+x.excess_fo,0),1)} MT</span></div>
+                  <div>Σ positive: <span className="text-red-400 font-mono">+{fmt(excessChartData.filter(x=>x.excess_fo>0).reduce((s,x)=>s+x.excess_fo,0),1)} MT</span></div>
+                  <div>Σ negative: <span className="text-emerald-400 font-mono">{fmt(excessChartData.filter(x=>x.excess_fo<0).reduce((s,x)=>s+x.excess_fo,0),1)} MT</span></div>
+                  <div>Net: <span className="font-mono text-slate-300">{(excessChartData.reduce((s,x)=>s+x.excess_fo,0)>=0?'+':'')}{fmt(excessChartData.reduce((s,x)=>s+x.excess_fo,0),1)} MT</span></div>
                 </div>
               </div>
-              <ExcessChart data={excess}/>
+              <ExcessChart data={excessChartData}/>
             </div>
           )}
-
-          {/* CII + Anomalies */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <CIIBadge rating={hasData ? cii.rating : '—'} attained={cii.attained} required={cii.ciiReq}/>
-            <div className="md:col-span-2 rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-slate-200">Alerts & Anomalies</h3>
-                <span className={`px-2 py-0.5 text-xs rounded font-bold ${anomalies.length>0?'bg-amber-600 text-white':'bg-emerald-600 text-white'}`}>
-                  {anomalies.length>0?`${anomalies.length} items`:'✓ Clear'}
-                </span>
-              </div>
-              {!hasData ? (
-                <div className="text-sm text-slate-500 italic">
-                  {selected === FLEET_KEY
-                    ? 'No voyages have been entered yet. Use the Voyages page to create your first voyage and noon reports.'
-                    : `No voyages recorded for ${selected}. Select a different vessel or use All Vessels view.`}
-                </div>
-              ) : anomalies.length === 0 ? (
-                <div className="text-sm text-green-400 flex items-center gap-2"><span>✓</span> No anomalies detected</div>
-              ) : (
-                <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                  {anomalies.map((a,i)=>(
-                    <div key={i} className="flex items-start gap-2 text-xs p-2 rounded-lg bg-amber-900/20 border border-amber-700/20">
-                      <span className="text-amber-400 mt-0.5">⚠</span>
-                      <div>
-                        <span className="text-slate-300 font-mono mr-2">{a.vessel_name} — {a.voyage_number}</span>
-                        <span className="text-amber-300">{a.message}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
 
           {/* Charts */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
