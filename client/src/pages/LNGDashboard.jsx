@@ -110,6 +110,88 @@ function BarChart({ data, yKey, color='#0F766E', yUnit='', tooltipLabel }) {
   );
 }
 
+// Per-voyage excess fuel — diverging bars (positive=RED above charter, negative=GREEN within)
+function ExcessChart({ data }) {
+  const [tip, setTip] = useState(null);
+  if (!data?.length) return <div className="text-slate-600 text-xs text-center py-8 italic">No voyage data yet</div>;
+  const W = 720, H = 220, PL = 50, PR = 16, PT = 14, PB = 42;
+  const cW = W - PL - PR, cH = H - PT - PB;
+  const vals = data.map(d => parseFloat(d.excess_fo) || 0);
+  const maxPos = Math.max(0, ...vals);
+  const maxNeg = Math.min(0, ...vals);
+  // Round to 'nice' bounds
+  const nice = v => {
+    const abs = Math.abs(v);
+    if (abs === 0) return 100;
+    const mag = Math.pow(10, Math.floor(Math.log10(abs)));
+    return Math.ceil(abs / mag) * mag;
+  };
+  const yMax = nice(maxPos || 100);
+  const yMin = -nice(Math.abs(maxNeg) || 100);
+  const yRange = yMax - yMin;
+  const zeroY = PT + cH * (yMax / yRange);
+  const gap = cW / data.length;
+  const bW = Math.max(3, (cW / data.length) * 0.7);
+  // Ticks every ~5 lines total
+  const ticks = [yMin, yMin / 2, 0, yMax / 2, yMax].map(t => Math.round(t));
+  const RED = '#DC2626', GREEN = '#16A34A';
+  return (
+    <>
+      <Tooltip tip={tip} />
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible' }}>
+        {ticks.map((t, i) => {
+          const y = PT + cH * ((yMax - t) / yRange);
+          const isZero = t === 0;
+          return (
+            <g key={i}>
+              <line x1={PL} y1={y} x2={W - PR} y2={y}
+                stroke={isZero ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.05)'}
+                strokeWidth={isZero ? 1.5 : 1} />
+              <text x={PL - 4} y={y + 3} fill="var(--chart-label,#94a3b8)" fontSize={9} textAnchor="end">
+                {t >= 0 ? '+' : ''}{Math.abs(t) >= 1000 ? (t / 1000).toFixed(1) + 'k' : t} MT
+              </text>
+            </g>
+          );
+        })}
+        {vals.map((v, i) => {
+          const x = PL + i * gap + (gap - bW) / 2;
+          const barTop = v >= 0 ? zeroY - (v / yRange) * cH : zeroY;
+          const barH = Math.abs(v / yRange) * cH;
+          const d = data[i];
+          const color = v >= 0 ? RED : GREEN;
+          return (
+            <rect key={i} x={x} y={barTop} width={bW} height={Math.max(1, barH)} fill={color} rx={2} opacity={0.9}
+              style={{ cursor: 'pointer' }}
+              onMouseEnter={e => setTip({
+                x: e.clientX, y: e.clientY,
+                label: `${d.vessel_name} — ${d.voyage_number} ${d.leg_type}`,
+                value: `${v >= 0 ? '+' : ''}${fmt(v, 1)} MT`,
+                sub: `Actual ${fmt(d.actual_fo, 1)} MT  /  Guaranteed ${fmt(d.guaranteed_fo, 1)} MT  (${d.first_date} → ${d.last_date})`,
+              })}
+              onMouseLeave={() => setTip(null)}
+            />
+          );
+        })}
+        {/* X-axis labels — show every Nth voyno so they don't collide */}
+        {data.map((d, i) => {
+          const step = Math.max(1, Math.ceil(data.length / 12));
+          if (i % step !== 0) return null;
+          const x = PL + i * gap + gap / 2;
+          const label = (d.voyage_number || '').slice(-6);
+          return (
+            <text key={i} x={x} y={H - 4} fill="var(--chart-label,#94a3b8)" fontSize={8.5} textAnchor="middle"
+              transform={`rotate(-30 ${x} ${H - 4})`}>{label}</text>
+          );
+        })}
+      </svg>
+      <div className="flex gap-4 justify-center text-[10px] text-slate-500 mt-1">
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: RED }} />above charter (chargeable)</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: GREEN }} />within charter (saving)</span>
+      </div>
+    </>
+  );
+}
+
 function CIIBadge({ rating, attained, required }) {
   const colors = { A:'#059669',B:'#0891B2',C:'#D97706',D:'#EA580C',E:'#DC2626' };
   const col = colors[rating]||'#94A3B8';
@@ -156,12 +238,16 @@ export default function LNGDashboard() {
     }).catch(() => {});
   }, []);
 
-  // Load analytics when selection changes
+  // Load analytics + excess-trend when selection changes
+  const [excess, setExcess] = useState([]);
   useEffect(() => {
     setLoading(true); setError('');
     const qs = selected === FLEET_KEY ? '' : `?vessel_name=${encodeURIComponent(selected)}`;
-    api.get(`/api/voyages/analytics${qs}`)
-      .then(d => { setData(d); setLoading(false); })
+    Promise.all([
+      api.get(`/api/voyages/analytics${qs}`),
+      api.get(`/api/voyages/excess-trend${qs}`).catch(() => []),
+    ])
+      .then(([d, ex]) => { setData(d); setExcess(ex || []); setLoading(false); })
       .catch(e => { setError(e.message); setLoading(false); });
   }, [selected]);
 
@@ -255,6 +341,24 @@ export default function LNGDashboard() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Per-voyage excess fuel trend — management KPI */}
+          {excess.length > 0 && (
+            <div className="rounded-xl border border-white/5 p-4" style={{background:'var(--card-bg)'}}>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-200">Excess Fuel per Voyage</h3>
+                  <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>Actual − guaranteed consumption, chronological. Positive bars = chargeable to charterer.</p>
+                </div>
+                <div className="text-right text-[10px] text-slate-500">
+                  <div>Σ positive: <span className="text-red-400 font-mono">+{fmt(excess.filter(x=>x.excess_fo>0).reduce((s,x)=>s+x.excess_fo,0),1)} MT</span></div>
+                  <div>Σ negative: <span className="text-emerald-400 font-mono">{fmt(excess.filter(x=>x.excess_fo<0).reduce((s,x)=>s+x.excess_fo,0),1)} MT</span></div>
+                  <div>Net: <span className="font-mono text-slate-300">{(excess.reduce((s,x)=>s+x.excess_fo,0)>=0?'+':'')}{fmt(excess.reduce((s,x)=>s+x.excess_fo,0),1)} MT</span></div>
+                </div>
+              </div>
+              <ExcessChart data={excess}/>
             </div>
           )}
 
