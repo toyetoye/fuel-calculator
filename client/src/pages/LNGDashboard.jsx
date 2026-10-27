@@ -413,10 +413,10 @@ export default function LNGDashboard() {
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-200">
-                    {selected === FLEET_KEY ? 'Excess Fuel per Vessel — YTD' : 'Excess Fuel per Voyage'}
+                    {selected === FLEET_KEY ? 'Reimbursable Excess per Vessel — YTD' : 'Reimbursable Excess per Voyage'}
                   </h3>
                   <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>
-                    Net of weather exclusions (matches Fleet Support claim methodology). Positive = chargeable.
+                    Chargeable excess net of weather exclusions — same methodology as Fleet Support claim.
                     {selected === FLEET_KEY ? ' Sorted worst → best.' : ' Chronological.'}
                   </p>
                 </div>
