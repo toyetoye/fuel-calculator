@@ -416,7 +416,7 @@ export default function LNGDashboard() {
                     {selected === FLEET_KEY ? 'Excess Fuel per Vessel — YTD' : 'Excess Fuel per Voyage'}
                   </h3>
                   <p className="text-xs" style={{color:"var(--text-muted,#94a3b8)"}}>
-                    Actual − guaranteed consumption. Positive bars = chargeable to charterer.
+                    Net of weather exclusions (matches Fleet Support claim methodology). Positive = chargeable.
                     {selected === FLEET_KEY ? ' Sorted worst → best.' : ' Chronological.'}
                   </p>
                 </div>
