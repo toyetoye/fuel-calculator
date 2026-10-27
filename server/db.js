@@ -139,19 +139,64 @@ const initDB = async () => {
     `);
     console.log('[Schema] NBO/FBO columns ensured on noon_reports');
 
-    // ── Curve migration: seed Rivers Plus BALLAST from Rivers BALLAST if empty ──
-    const rpBallastCount = await client.query(
-      "SELECT COUNT(*) FROM interpolation_curves WHERE vessel_class='Rivers Plus' AND leg_type='BALLAST'"
+    // ── Fuel curve correction migration (one-shot, idempotent) ──
+    // Historical state: DB "Rivers" curves held Rivers Plus values; DB "Rivers Plus LADEN"
+    // was truncated at 12.6 kt (only 36 points), pegging lookups above 12.6 at 82.256 MT.
+    // Vessel class assignments were also inverted vs physical hull dimensions.
+    // Fingerprint: Rivers LADEN at speed 16.1 kt should be 126.59 MT in corrected state
+    // (was 126.352 MT in broken state — those were Rivers Plus values).
+    const fp = await client.query(
+      "SELECT fuel FROM interpolation_curves WHERE vessel_class='Rivers' AND leg_type='LADEN' AND speed = 16.1"
     );
-    if (parseInt(rpBallastCount.rows[0].count) === 0) {
-      await client.query(`
-        INSERT INTO interpolation_curves (vessel_class, leg_type, speed, fuel)
-        SELECT 'Rivers Plus', leg_type, speed, fuel
-        FROM interpolation_curves
-        WHERE vessel_class = 'Rivers' AND leg_type = 'BALLAST'
-        ON CONFLICT DO NOTHING
-      `);
-      console.log('[DB] Seeded Rivers Plus BALLAST curves from Rivers BALLAST');
+    const corrected = fp.rows.length && Math.abs(parseFloat(fp.rows[0].fuel) - 126.59) < 0.05;
+    if (!corrected) {
+      console.log('[Migration] Applying fuel curve correction (NSML charter-party curves)…');
+      const CURVES = require('./data/corrected-fuel-curves');
+      await client.query('BEGIN');
+      try {
+        // 1. Wipe existing Rivers and Rivers Plus curves (any other classes are left alone)
+        await client.query(
+          "DELETE FROM interpolation_curves WHERE vessel_class IN ('Rivers', 'Rivers Plus')"
+        );
+        // 2. Reload all four curves from the authoritative data file
+        for (const key of Object.keys(CURVES)) {
+          const [cls, leg] = key.split(/_(?=LADEN$|BALLAST$)/);
+          const points = CURVES[key];
+          // Chunk inserts to keep parameter count under PG limits
+          const CHUNK = 500;
+          for (let i = 0; i < points.length; i += CHUNK) {
+            const slice = points.slice(i, i + CHUNK);
+            const values = slice.map((_, j) =>
+              `($1, $2, $${3 + j*2}, $${4 + j*2})`
+            ).join(',');
+            const params = [cls, leg];
+            for (const [s, f] of slice) params.push(s, f);
+            await client.query(
+              `INSERT INTO interpolation_curves (vessel_class, leg_type, speed, fuel) VALUES ${values}`,
+              params
+            );
+          }
+          console.log(`[Migration]   ${cls} ${leg}: ${points.length} points loaded`);
+        }
+        // 3. Fix vessel class assignments by physical hull size
+        //    137,100 m³ (pitch 7.52)  → Rivers class
+        //    141,090 m³ (pitch 7.8329) → Rivers Plus class
+        const rc = await client.query(
+          "UPDATE lng_vessels SET vessel_class='Rivers' WHERE capacity_m3 = 137100"
+        );
+        const rpc = await client.query(
+          "UPDATE lng_vessels SET vessel_class='Rivers Plus' WHERE capacity_m3 = 141090"
+        );
+        console.log(`[Migration]   Vessels reassigned: ${rc.rowCount} to Rivers, ${rpc.rowCount} to Rivers Plus`);
+        await client.query('COMMIT');
+        console.log('[Migration] ✓ Fuel curve correction applied');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        console.error('[Migration] ✗ Fuel curve correction FAILED, rolled back:', e.message);
+        throw e;
+      }
+    } else {
+      console.log('[Migration] Fuel curves already in corrected state (fingerprint matched)');
     }
 
     // Add columns if missing (for upgrades)
